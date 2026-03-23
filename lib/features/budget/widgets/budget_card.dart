@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../models/budget_usage_model.dart';
 
 class BudgetCard extends StatelessWidget {
@@ -23,10 +23,7 @@ class BudgetCard extends StatelessWidget {
     final card = isDark ? const Color(0xFF141420) : Colors.white;
     final muted = isDark ? Colors.white54 : const Color(0xFF6D7892);
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
-    final currencyFormat = NumberFormat.compactCurrency(
-      locale: 'id_ID',
-      symbol: 'Rp',
-    );
+    final currencyFormat = CurrencySettings.compactFormatter();
 
     Color progressColor = const Color(0xFF00D4AA);
     if (budget.usagePct >= 90) {

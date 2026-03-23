@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../transaction_repository.dart';
 import 'add_transaction_screen.dart';
@@ -81,11 +82,7 @@ class _TransactionDetailScreenState
         ? const Color(0xFF00D4AA)
         : const Color(0xFFFF5A6E);
     final sign = isIncome ? '+' : '-';
-    final amount = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    ).format(tx.amount);
+    final amount = CurrencySettings.format(tx.amount);
     final displayDate =
         tx.date.hour == 0 && tx.date.minute == 0 && tx.date.second == 0
         ? tx.createdAt

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../transaction_repository.dart';
 import '../transaction_notifier.dart';
@@ -22,7 +22,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
-  final _amountFormat = NumberFormat.decimalPattern('id_ID');
+  final _amountFormat = CurrencySettings.decimalFormatter();
 
   String _type = 'expense';
   String _category = TransactionCategories.expense.first;
@@ -187,7 +187,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   textAlign: TextAlign.center,
                   decoration: _fieldDecoration(
                     '',
-                    prefix: 'Rp',
+                    prefix: CurrencySettings.current.symbol.trim(),
                     isDark: isDark,
                     large: true,
                   ),
@@ -409,7 +409,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
 }
 
 class _IdrThousandsFormatter extends TextInputFormatter {
-  final _format = NumberFormat.decimalPattern('id_ID');
+  final _format = CurrencySettings.decimalFormatter();
 
   @override
   TextEditingValue formatEditUpdate(

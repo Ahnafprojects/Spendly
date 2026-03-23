@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_shimmer.dart';
 import 'transaction_detail_screen.dart';
 import '../transaction_repository.dart';
@@ -233,11 +234,7 @@ class _TransactionHistoryScreenState
                   final amountColor = isIncome
                       ? const Color(0xFF00D4AA)
                       : const Color(0xFFFF5A6E);
-                  final amount = NumberFormat.currency(
-                    locale: 'id_ID',
-                    symbol: 'Rp ',
-                    decimalDigits: 0,
-                  ).format(tx.amount);
+                  final amount = CurrencySettings.format(tx.amount);
                   final displayDate =
                       tx.date.hour == 0 &&
                           tx.date.minute == 0 &&
