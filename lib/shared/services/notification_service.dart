@@ -1,0 +1,97 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class NotificationService {
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  static Future<void> initialize() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _notificationsPlugin.initialize(initSettings);
+  }
+
+  static Future<bool> _canNotifyToday(String category, String type) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final key = 'notif_${type}_${category}_$today';
+
+    if (prefs.getBool(key) == true) return false;
+    await prefs.setBool(key, true);
+    return true;
+  }
+
+  static Future<void> showBudgetWarning(
+    String category,
+    double usagePct,
+    double limit,
+  ) async {
+    if (!await _canNotifyToday(category, 'warning')) return;
+
+    final formattedLimit = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp',
+      decimalDigits: 0,
+    ).format(limit);
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'budget_channel',
+      'Budget Alerts',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await _notificationsPlugin.show(
+      category.hashCode,
+      'Budget $category Hampir Habis!',
+      'Sudah terpakai ${usagePct.toStringAsFixed(0)}% dari $formattedLimit.',
+      details,
+    );
+  }
+
+  static Future<void> showBudgetExceeded(String category, double excess) async {
+    if (!await _canNotifyToday(category, 'exceeded')) return;
+
+    final formattedExcess = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp',
+      decimalDigits: 0,
+    ).format(excess);
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'budget_channel',
+      'Budget Alerts',
+      importance: Importance.max,
+      priority: Priority.max,
+      color: Color(0xFFFF4C4C),
+    );
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await _notificationsPlugin.show(
+      category.hashCode + 1,
+      'Budget $category Melebihi Limit!',
+      'Kamu overspend sebesar $formattedExcess. Hati-hati!',
+      details,
+    );
+  }
+}
