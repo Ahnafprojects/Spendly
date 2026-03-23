@@ -5,6 +5,7 @@ import '../models/budget_usage_model.dart';
 import '../budget_notifier.dart';
 import '../widgets/add_budget_sheet.dart';
 import '../widgets/budget_card.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_shimmer.dart';
 
 class BudgetScreen extends ConsumerWidget {
@@ -206,10 +207,7 @@ class BudgetScreen extends ConsumerWidget {
   }) {
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
     final muted = isDark ? Colors.white70 : const Color(0xFF5B6275);
-    final currencyFormat = NumberFormat.compactCurrency(
-      locale: 'id_ID',
-      symbol: 'Rp',
-    );
+    final currencyFormat = CurrencySettings.compactFormatter();
     Color barColor = const Color(0xFF00D4AA);
     if (usagePct >= 0.9) {
       barColor = const Color(0xFFFF4C4C);

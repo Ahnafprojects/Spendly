@@ -10,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/services/offline_store.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../auth/auth_notifier.dart';
@@ -29,6 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _pushNotif = true;
   bool _budgetAlert = true;
   bool _busy = false;
+  String _currencyCode = CurrencySettings.current.code;
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _pushNotif = prefs.getBool(_kPushNotif) ?? true;
       _budgetAlert = prefs.getBool(_kBudgetAlert) ?? true;
+      _currencyCode = CurrencySettings.current.code;
     });
   }
 
@@ -224,12 +227,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               pw.Bullet(text: 'Total transaksi: ${txList.length}'),
               pw.Bullet(
-                text:
-                    'Total income: ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(totalIncome)}',
+                text: 'Total income: ${CurrencySettings.format(totalIncome)}',
               ),
               pw.Bullet(
-                text:
-                    'Total expense: ${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0).format(totalExpense)}',
+                text: 'Total expense: ${CurrencySettings.format(totalExpense)}',
               ),
               pw.Bullet(text: 'Total budget: ${budgetList.length}'),
               pw.SizedBox(height: 12),
@@ -387,6 +388,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _pickCurrency() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: CurrencySettings.options.map((option) {
+              final active = option.code == _currencyCode;
+              return ListTile(
+                title: Text('${option.code} (${option.symbol.trim()})'),
+                subtitle: Text(option.label),
+                trailing: active
+                    ? const Icon(Icons.check_circle, color: Color(0xFF2E90FA))
+                    : null,
+                onTap: () => Navigator.pop(context, option.code),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null || selected == _currencyCode) return;
+    await CurrencySettings.setCurrencyCode(selected);
+    if (!mounted) return;
+    setState(() => _currencyCode = selected);
+    AppNotice.success(context, 'Mata uang diubah ke $selected');
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentMode = ref.watch(themeProvider);
@@ -464,6 +498,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .read(themeProvider.notifier)
                   .setThemeMode(v ? ThemeMode.dark : ThemeMode.light),
             ),
+          ),
+          _tile(
+            icon: Icons.attach_money_rounded,
+            title: 'Mata Uang',
+            subtitle: _currencyCode,
+            onTap: _pickCurrency,
           ),
           _tile(
             icon: Icons.notifications_active_rounded,

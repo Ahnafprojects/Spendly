@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'currency_settings.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -12,10 +13,10 @@ class NotificationService {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
@@ -41,19 +42,15 @@ class NotificationService {
   ) async {
     if (!await _canNotifyToday(category, 'warning')) return;
 
-    final formattedLimit = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp',
-      decimalDigits: 0,
-    ).format(limit);
+    final formattedLimit = CurrencySettings.format(limit);
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      'budget_channel',
-      'Budget Alerts',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
+          'budget_channel',
+          'Budget Alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+        );
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
     );
@@ -69,20 +66,16 @@ class NotificationService {
   static Future<void> showBudgetExceeded(String category, double excess) async {
     if (!await _canNotifyToday(category, 'exceeded')) return;
 
-    final formattedExcess = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp',
-      decimalDigits: 0,
-    ).format(excess);
+    final formattedExcess = CurrencySettings.format(excess);
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      'budget_channel',
-      'Budget Alerts',
-      importance: Importance.max,
-      priority: Priority.max,
-      color: Color(0xFFFF4C4C),
-    );
+          'budget_channel',
+          'Budget Alerts',
+          importance: Importance.max,
+          priority: Priority.max,
+          color: Color(0xFFFF4C4C),
+        );
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
     );

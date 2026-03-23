@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 
 class TransferScreen extends StatefulWidget {
@@ -16,12 +17,8 @@ class TransferScreen extends StatefulWidget {
 
 class _TransferScreenState extends State<TransferScreen> {
   static const _storageKey = 'savings_goals_v1';
-  final _currency = NumberFormat.currency(
-    locale: 'id_ID',
-    symbol: 'Rp ',
-    decimalDigits: 0,
-  );
-  final _compact = NumberFormat.compactCurrency(locale: 'id_ID', symbol: 'Rp');
+  NumberFormat get _currency => CurrencySettings.moneyFormatter();
+  NumberFormat get _compact => CurrencySettings.compactFormatter();
   bool _loading = true;
   List<_GoalItem> _goals = [];
 
@@ -78,14 +75,12 @@ class _TransferScreenState extends State<TransferScreen> {
     final targetC = TextEditingController(
       text: initial == null
           ? ''
-          : NumberFormat.decimalPattern('id_ID').format(initial.target.toInt()),
+          : CurrencySettings.decimalFormatter().format(initial.target.toInt()),
     );
     final currentC = TextEditingController(
       text: initial == null
           ? ''
-          : NumberFormat.decimalPattern(
-              'id_ID',
-            ).format(initial.current.toInt()),
+          : CurrencySettings.decimalFormatter().format(initial.current.toInt()),
     );
     DateTime? selectedDeadline = initial?.deadline;
     final formKey = GlobalKey<FormState>();
@@ -159,7 +154,7 @@ class _TransferScreenState extends State<TransferScreen> {
                           context,
                           isDark: isDark,
                           hint: 'Target nominal',
-                          prefix: 'Rp ',
+                          prefix: CurrencySettings.current.symbol,
                         ),
                         validator: (v) {
                           final n = _parse(v);
@@ -181,7 +176,7 @@ class _TransferScreenState extends State<TransferScreen> {
                           context,
                           isDark: isDark,
                           hint: 'Saldo awal (opsional)',
-                          prefix: 'Rp ',
+                          prefix: CurrencySettings.current.symbol,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -294,8 +289,8 @@ class _TransferScreenState extends State<TransferScreen> {
             style: TextStyle(
               color: isDark ? Colors.white : const Color(0xFF1A1E2A),
             ),
-            decoration: const InputDecoration(
-              prefixText: 'Rp ',
+            decoration: InputDecoration(
+              prefixText: CurrencySettings.current.symbol,
               hintText: 'Nominal setoran',
             ),
           ),
@@ -647,7 +642,7 @@ class _GoalItem {
 }
 
 class _IdrThousandsFormatter extends TextInputFormatter {
-  final _format = NumberFormat.decimalPattern('id_ID');
+  final _format = CurrencySettings.decimalFormatter();
 
   @override
   TextEditingValue formatEditUpdate(

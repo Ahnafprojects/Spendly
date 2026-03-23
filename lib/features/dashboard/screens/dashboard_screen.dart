@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../transaction/transaction_notifier.dart';
 import '../../transaction/screens/transaction_detail_screen.dart';
@@ -260,11 +261,7 @@ class DashboardScreen extends ConsumerWidget {
             duration: const Duration(milliseconds: 900),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {
-              final formattedValue = NumberFormat.currency(
-                locale: 'id_ID',
-                symbol: 'Rp ',
-                decimalDigits: 0,
-              ).format(value);
+              final formattedValue = CurrencySettings.format(value);
               return Text(
                 formattedValue,
                 style: TextStyle(
@@ -310,11 +307,7 @@ class DashboardScreen extends ConsumerWidget {
   }) {
     final color = isIncome ? const Color(0xFF00D4AA) : const Color(0xFFFF4C4C);
     final icon = isIncome ? Icons.south_west_rounded : Icons.north_east_rounded;
-    final formatted = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    ).format(amount);
+    final formatted = CurrencySettings.format(amount);
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -482,11 +475,6 @@ class DashboardScreen extends ConsumerWidget {
           );
         }
         final pct = (goal.current / goal.target).clamp(0.0, 1.0);
-        final currency = NumberFormat.currency(
-          locale: 'id_ID',
-          symbol: 'Rp ',
-          decimalDigits: 0,
-        );
         return InkWell(
           onTap: () => context.pushNamed('transfer'),
           borderRadius: BorderRadius.circular(16),
@@ -546,7 +534,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${currency.format(goal.current)} / ${currency.format(goal.target)}',
+                  '${CurrencySettings.format(goal.current)} / ${CurrencySettings.format(goal.target)}',
                   style: TextStyle(color: muted, fontSize: 12),
                 ),
               ],
@@ -658,11 +646,7 @@ class DashboardScreen extends ConsumerWidget {
         ? const Color(0xFF00D4AA)
         : const Color(0xFFFF4C4C);
     final sign = isIncome ? '+' : '-';
-    final formattedAmount = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    ).format(tx.amount);
+    final formattedAmount = CurrencySettings.format(tx.amount);
     final formattedDate = DateFormat('dd MMM yyyy').format(tx.date);
 
     final categoryIcon = categoryIconFor(tx.category);

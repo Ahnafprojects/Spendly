@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../budget_notifier.dart';
 
 class AddBudgetSheet extends ConsumerStatefulWidget {
@@ -27,9 +27,9 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
       _selectedCategory = widget.initialCategory!;
     }
     if (widget.initialAmount != null) {
-      _amountController.text = NumberFormat.decimalPattern(
-        'id_ID',
-      ).format(widget.initialAmount!.toInt());
+      _amountController.text = CurrencySettings.decimalFormatter().format(
+        widget.initialAmount!.toInt(),
+      );
     }
   }
 
@@ -94,7 +94,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                 ),
                 textAlign: TextAlign.center,
                 decoration: InputDecoration(
-                  prefixText: 'Rp ',
+                  prefixText: CurrencySettings.current.symbol,
                   prefixStyle: TextStyle(color: softMuted, fontSize: 32),
                   hintText: '0',
                   hintStyle: TextStyle(
@@ -238,9 +238,9 @@ class _IdrThousandsFormatter extends TextInputFormatter {
   ) {
     final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digitsOnly.isEmpty) return const TextEditingValue(text: '');
-    final formatted = NumberFormat.decimalPattern(
-      'id_ID',
-    ).format(int.parse(digitsOnly));
+    final formatted = CurrencySettings.decimalFormatter().format(
+      int.parse(digitsOnly),
+    );
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),

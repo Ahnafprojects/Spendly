@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../../shared/services/currency_settings.dart';
 import '../analytics_notifier.dart';
 import '../analytics_repository.dart';
 
@@ -17,11 +18,6 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   int _touchedPieIndex = -1;
-  final _currencyFormat = NumberFormat.currency(
-    locale: 'id_ID',
-    symbol: 'Rp ',
-    decimalDigits: 0,
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +182,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _currencyFormat.format(data.netSaving),
+            CurrencySettings.format(data.netSaving),
             style: TextStyle(
               color: isPositive
                   ? const Color(0xFF00D4AA)
@@ -278,10 +274,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            NumberFormat.compactCurrency(
-              locale: 'id_ID',
-              symbol: 'Rp',
-            ).format(value),
+            CurrencySettings.compactFormatter().format(value),
             style: TextStyle(
               color: isDark ? Colors.white : const Color(0xFF1A1E2A),
               fontSize: 16,
@@ -325,7 +318,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final isIncome = rodIndex == 0;
                 return BarTooltipItem(
-                  '${isIncome ? 'Income' : 'Expense'}\n${_currencyFormat.format(rod.toY)}',
+                  '${isIncome ? 'Income' : 'Expense'}\n${CurrencySettings.format(rod.toY)}',
                   TextStyle(
                     color: isIncome
                         ? const Color(0xFF00D4AA)
@@ -344,7 +337,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 reservedSize: 44,
                 interval: maxY / 4,
                 getTitlesWidget: (value, _) => Text(
-                  NumberFormat.compact(locale: 'id_ID').format(value),
+                  NumberFormat.compact(
+                    locale: CurrencySettings.current.locale,
+                  ).format(value),
                   style: TextStyle(
                     color: isDark ? Colors.white38 : const Color(0xFF7B88A6),
                     fontSize: 10,
@@ -605,7 +600,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       ),
                     ),
                     Text(
-                      _currencyFormat.format(item.amount),
+                      CurrencySettings.format(item.amount),
                       style: TextStyle(
                         color: isDark
                             ? Colors.white70
