@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../models/budget_usage_model.dart';
 
@@ -23,7 +24,6 @@ class BudgetCard extends StatelessWidget {
     final card = isDark ? const Color(0xFF141420) : Colors.white;
     final muted = isDark ? Colors.white54 : const Color(0xFF6D7892);
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
-    final currencyFormat = CurrencySettings.compactFormatter();
 
     Color progressColor = const Color(0xFF00D4AA);
     if (budget.usagePct >= 90) {
@@ -74,7 +74,7 @@ class BudgetCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      budget.category,
+                      localizeCategory(budget.category),
                       style: TextStyle(
                         color: title,
                         fontSize: 16,
@@ -90,7 +90,7 @@ class BudgetCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          currencyFormat.format(budget.spentAmount),
+                          CurrencySettings.formatCompact(budget.spentAmount),
                           style: TextStyle(
                             color: progressColor,
                             fontSize: 14,
@@ -98,7 +98,7 @@ class BudgetCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'dari ${currencyFormat.format(budget.limitAmount)}',
+                          '${AppText.t(id: 'dari', en: 'of')} ${CurrencySettings.formatCompact(budget.limitAmount)}',
                           style: TextStyle(color: muted, fontSize: 11),
                         ),
                       ],
@@ -158,7 +158,7 @@ class BudgetCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Over Budget! Kamu melebihi ${currencyFormat.format(budget.spentAmount - budget.limitAmount)}',
+                      '${AppText.t(id: 'Budget Terlampaui!', en: 'Over Budget!')} ${AppText.t(id: 'Kamu melebihi', en: 'You exceeded')} ${CurrencySettings.formatCompact(budget.spentAmount - budget.limitAmount)}',
                       style: const TextStyle(
                         color: Color(0xFFFF4C4C),
                         fontSize: 12,

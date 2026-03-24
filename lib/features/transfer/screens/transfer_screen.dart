@@ -3,24 +3,26 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 
-class TransferScreen extends StatefulWidget {
+class TransferScreen extends ConsumerStatefulWidget {
   const TransferScreen({super.key});
 
   @override
-  State<TransferScreen> createState() => _TransferScreenState();
+  ConsumerState<TransferScreen> createState() => _TransferScreenState();
 }
 
-class _TransferScreenState extends State<TransferScreen> {
+class _TransferScreenState extends ConsumerState<TransferScreen> {
   static const _storageKey = 'savings_goals_v1';
-  NumberFormat get _currency => CurrencySettings.moneyFormatter();
-  NumberFormat get _compact => CurrencySettings.compactFormatter();
   bool _loading = true;
   List<_GoalItem> _goals = [];
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   @override
   void initState() {
@@ -75,12 +77,12 @@ class _TransferScreenState extends State<TransferScreen> {
     final targetC = TextEditingController(
       text: initial == null
           ? ''
-          : CurrencySettings.decimalFormatter().format(initial.target.toInt()),
+          : CurrencySettings.formatInputFromIdr(initial.target),
     );
     final currentC = TextEditingController(
       text: initial == null
           ? ''
-          : CurrencySettings.decimalFormatter().format(initial.current.toInt()),
+          : CurrencySettings.formatInputFromIdr(initial.current),
     );
     DateTime? selectedDeadline = initial?.deadline;
     final formKey = GlobalKey<FormState>();
@@ -110,7 +112,9 @@ class _TransferScreenState extends State<TransferScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        initial == null ? 'Buat Target Nabung' : 'Edit Target',
+                        initial == null
+                            ? _t('Buat Target Nabung', 'Create Savings Goal')
+                            : _t('Edit Target', 'Edit Goal'),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -131,11 +135,17 @@ class _TransferScreenState extends State<TransferScreen> {
                         decoration: _inputDecoration(
                           context,
                           isDark: isDark,
-                          hint: 'Nama target (contoh: Dana Darurat)',
+                          hint: _t(
+                            'Nama target (contoh: Dana Darurat)',
+                            'Goal name (example: Emergency Fund)',
+                          ),
                         ),
                         validator: (v) {
                           if ((v ?? '').trim().isEmpty) {
-                            return 'Nama target wajib diisi';
+                            return _t(
+                              'Nama target wajib diisi',
+                              'Goal name is required',
+                            );
                           }
                           return null;
                         },
@@ -144,7 +154,7 @@ class _TransferScreenState extends State<TransferScreen> {
                       TextFormField(
                         controller: targetC,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [_IdrThousandsFormatter()],
+                        inputFormatters: [_CurrencyThousandsFormatter()],
                         style: TextStyle(
                           color: isDark
                               ? Colors.white
@@ -153,12 +163,17 @@ class _TransferScreenState extends State<TransferScreen> {
                         decoration: _inputDecoration(
                           context,
                           isDark: isDark,
-                          hint: 'Target nominal',
+                          hint: _t('Target nominal', 'Target amount'),
                           prefix: CurrencySettings.current.symbol,
                         ),
                         validator: (v) {
                           final n = _parse(v);
-                          if (n <= 0) return 'Target harus lebih dari 0';
+                          if (n <= 0) {
+                            return _t(
+                              'Target harus lebih dari 0',
+                              'Target must be greater than 0',
+                            );
+                          }
                           return null;
                         },
                       ),
@@ -166,7 +181,7 @@ class _TransferScreenState extends State<TransferScreen> {
                       TextFormField(
                         controller: currentC,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [_IdrThousandsFormatter()],
+                        inputFormatters: [_CurrencyThousandsFormatter()],
                         style: TextStyle(
                           color: isDark
                               ? Colors.white
@@ -175,7 +190,10 @@ class _TransferScreenState extends State<TransferScreen> {
                         decoration: _inputDecoration(
                           context,
                           isDark: isDark,
-                          hint: 'Saldo awal (opsional)',
+                          hint: _t(
+                            'Saldo awal (opsional)',
+                            'Initial amount (optional)',
+                          ),
                           prefix: CurrencySettings.current.symbol,
                         ),
                       ),
@@ -188,8 +206,11 @@ class _TransferScreenState extends State<TransferScreen> {
                           children: [
                             Text(
                               selectedDeadline == null
-                                  ? 'Deadline: belum dipilih'
-                                  : 'Deadline: ${DateFormat('dd MMM yyyy', 'id_ID').format(selectedDeadline!)}',
+                                  ? _t(
+                                      'Deadline: belum dipilih',
+                                      'Deadline: not selected',
+                                    )
+                                  : '${_t('Deadline', 'Deadline')}: ${DateFormat('dd MMM yyyy', LanguageSettings.current.locale.toString()).format(selectedDeadline!)}',
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white60
@@ -210,13 +231,13 @@ class _TransferScreenState extends State<TransferScreen> {
                                   lastDate: DateTime.now().add(
                                     const Duration(days: 3650),
                                   ),
-                                  locale: const Locale('id', 'ID'),
+                                  locale: LanguageSettings.current.locale,
                                 );
                                 if (picked != null) {
                                   setLocal(() => selectedDeadline = picked);
                                 }
                               },
-                              child: const Text('Pilih Tanggal'),
+                              child: Text(_t('Pilih Tanggal', 'Pick Date')),
                             ),
                           ],
                         ),
@@ -234,7 +255,9 @@ class _TransferScreenState extends State<TransferScreen> {
                             Navigator.pop(ctx, true);
                           },
                           child: Text(
-                            initial == null ? 'Simpan Target' : 'Update Target',
+                            initial == null
+                                ? _t('Simpan Target', 'Save Goal')
+                                : _t('Update Target', 'Update Goal'),
                           ),
                         ),
                       ),
@@ -270,7 +293,9 @@ class _TransferScreenState extends State<TransferScreen> {
     if (!mounted) return;
     AppNotice.success(
       context,
-      initial == null ? 'Target tabungan dibuat' : 'Target tabungan diperbarui',
+      initial == null
+          ? _t('Target tabungan dibuat', 'Savings goal created')
+          : _t('Target tabungan diperbarui', 'Savings goal updated'),
     );
   }
 
@@ -281,27 +306,27 @@ class _TransferScreenState extends State<TransferScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Tambah Setoran'),
+          title: Text(_t('Tambah Setoran', 'Add Deposit')),
           content: TextField(
             controller: amountC,
             keyboardType: TextInputType.number,
-            inputFormatters: [_IdrThousandsFormatter()],
+            inputFormatters: [_CurrencyThousandsFormatter()],
             style: TextStyle(
               color: isDark ? Colors.white : const Color(0xFF1A1E2A),
             ),
             decoration: InputDecoration(
               prefixText: CurrencySettings.current.symbol,
-              hintText: 'Nominal setoran',
+              hintText: _t('Nominal setoran', 'Deposit amount'),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal'),
+              child: Text(_t('Batal', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Simpan'),
+              child: Text(_t('Simpan', 'Save')),
             ),
           ],
         );
@@ -312,7 +337,10 @@ class _TransferScreenState extends State<TransferScreen> {
     final value = _parse(amountC.text);
     if (value <= 0) {
       if (!mounted) return;
-      AppNotice.warning(context, 'Nominal setoran tidak valid');
+      AppNotice.warning(
+        context,
+        _t('Nominal setoran tidak valid', 'Invalid deposit amount'),
+      );
       return;
     }
     setState(() {
@@ -325,23 +353,31 @@ class _TransferScreenState extends State<TransferScreen> {
     });
     await _saveGoals();
     if (!mounted) return;
-    AppNotice.success(context, 'Setoran berhasil ditambahkan');
+    AppNotice.success(
+      context,
+      _t('Setoran berhasil ditambahkan', 'Deposit added successfully'),
+    );
   }
 
   Future<void> _deleteGoal(_GoalItem goal) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Hapus Target?'),
-        content: Text('Target "${goal.title}" akan dihapus.'),
+        title: Text(_t('Hapus Target?', 'Delete Goal?')),
+        content: Text(
+          _t(
+            'Target "${goal.title}" akan dihapus.',
+            'Goal "${goal.title}" will be deleted.',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: Text(_t('Batal', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: Text(_t('Hapus', 'Delete')),
           ),
         ],
       ),
@@ -350,16 +386,17 @@ class _TransferScreenState extends State<TransferScreen> {
     setState(() => _goals.removeWhere((g) => g.id == goal.id));
     await _saveGoals();
     if (!mounted) return;
-    AppNotice.info(context, 'Target dihapus');
+    AppNotice.info(context, _t('Target dihapus', 'Goal deleted'));
   }
 
   double _parse(String? text) {
-    final digits = (text ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    return digits.isEmpty ? 0 : double.parse(digits);
+    return CurrencySettings.parseInputToIdr(text ?? '');
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF090B14) : const Color(0xFFF4F7FC);
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
@@ -368,14 +405,20 @@ class _TransferScreenState extends State<TransferScreen> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        title: Text('Target Nabung', style: TextStyle(color: title)),
+        title: Text(
+          _t('Target Nabung', 'Savings Goals'),
+          style: TextStyle(color: title),
+        ),
         backgroundColor: Colors.transparent,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showGoalForm(),
         backgroundColor: const Color(0xFF2E90FA),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Tambah', style: TextStyle(color: Colors.white)),
+        label: Text(
+          _t('Tambah', 'Add'),
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -393,7 +436,7 @@ class _TransferScreenState extends State<TransferScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Belum ada target tabungan',
+                      _t('Belum ada target tabungan', 'No savings goals yet'),
                       style: TextStyle(
                         color: title,
                         fontWeight: FontWeight.w700,
@@ -402,7 +445,10 @@ class _TransferScreenState extends State<TransferScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Buat target pertama kamu, lalu isi setoran sedikit demi sedikit.',
+                      _t(
+                        'Buat target pertama kamu, lalu isi setoran sedikit demi sedikit.',
+                        'Create your first goal, then deposit gradually.',
+                      ),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: muted),
                     ),
@@ -457,18 +503,20 @@ class _TransferScreenState extends State<TransferScreen> {
                                 await _deleteGoal(g);
                               }
                             },
-                            itemBuilder: (_) => const [
+                            itemBuilder: (_) => [
                               PopupMenuItem(
                                 value: 'deposit',
-                                child: Text('Tambah Setoran'),
+                                child: Text(
+                                  _t('Tambah Setoran', 'Add Deposit'),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: 'edit',
-                                child: Text('Edit Target'),
+                                child: Text(_t('Edit Target', 'Edit Goal')),
                               ),
                               PopupMenuItem(
                                 value: 'delete',
-                                child: Text('Hapus Target'),
+                                child: Text(_t('Hapus Target', 'Delete Goal')),
                               ),
                             ],
                           ),
@@ -476,7 +524,7 @@ class _TransferScreenState extends State<TransferScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${_currency.format(g.current)} / ${_currency.format(g.target)}',
+                        '${CurrencySettings.format(g.current)} / ${CurrencySettings.format(g.target)}',
                         style: TextStyle(
                           color: isDark
                               ? Colors.white70
@@ -505,7 +553,8 @@ class _TransferScreenState extends State<TransferScreen> {
                         children: [
                           _metaChip(
                             isDark: isDark,
-                            text: 'Sisa ${_compact.format(remaining)}',
+                            text:
+                                '${_t('Sisa', 'Remaining')} ${CurrencySettings.formatCompact(remaining)}',
                           ),
                           _metaChip(
                             isDark: isDark,
@@ -515,7 +564,7 @@ class _TransferScreenState extends State<TransferScreen> {
                             _metaChip(
                               isDark: isDark,
                               text:
-                                  'Deadline ${DateFormat('dd MMM yyyy', 'id_ID').format(g.deadline!)}',
+                                  '${_t('Deadline', 'Deadline')} ${DateFormat('dd MMM yyyy', LanguageSettings.current.locale.toString()).format(g.deadline!)}',
                             ),
                         ],
                       ),
@@ -641,9 +690,7 @@ class _GoalItem {
   }
 }
 
-class _IdrThousandsFormatter extends TextInputFormatter {
-  final _format = CurrencySettings.decimalFormatter();
-
+class _CurrencyThousandsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -651,7 +698,9 @@ class _IdrThousandsFormatter extends TextInputFormatter {
   ) {
     final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) return const TextEditingValue(text: '');
-    final formatted = _format.format(int.parse(digits));
+    final formatted = CurrencySettings.decimalFormatter().format(
+      int.parse(digits),
+    );
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),

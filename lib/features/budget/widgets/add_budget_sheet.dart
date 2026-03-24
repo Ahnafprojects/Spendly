@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../budget_notifier.dart';
 
 class AddBudgetSheet extends ConsumerStatefulWidget {
@@ -20,6 +22,8 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
   final List<String> _categories = TransactionCategories.expense;
   bool _showAllCategories = false;
 
+  String _t(String id, String en) => AppText.t(id: id, en: en);
+
   @override
   void initState() {
     super.initState();
@@ -27,8 +31,8 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
       _selectedCategory = widget.initialCategory!;
     }
     if (widget.initialAmount != null) {
-      _amountController.text = CurrencySettings.decimalFormatter().format(
-        widget.initialAmount!.toInt(),
+      _amountController.text = CurrencySettings.formatInputFromIdr(
+        widget.initialAmount!,
       );
     }
   }
@@ -41,6 +45,8 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF141420) : const Color(0xFFF4F7FC);
     final card = isDark ? const Color(0xFF1C1C2E) : Colors.white;
@@ -74,7 +80,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Set Budget Kategori',
+                _t('Set Budget Kategori', 'Set Category Budget'),
                 style: TextStyle(
                   color: title,
                   fontSize: 20,
@@ -86,7 +92,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
               TextField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [_IdrThousandsFormatter()],
+                inputFormatters: [_CurrencyThousandsFormatter()],
                 style: TextStyle(
                   color: title,
                   fontSize: 32,
@@ -120,7 +126,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Pilih Kategori',
+                _t('Pilih Kategori', 'Choose Category'),
                 style: TextStyle(color: muted, fontSize: 14),
               ),
               const SizedBox(height: 16),
@@ -158,7 +164,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            cat,
+                            localizeCategory(cat),
                             style: TextStyle(
                               color: isSelected ? Colors.white : softMuted,
                               fontSize: 10,
@@ -178,8 +184,14 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                       setState(() => _showAllCategories = !_showAllCategories),
                   child: Text(
                     _showAllCategories
-                        ? 'Sembunyikan sebagian kategori'
-                        : 'Tampilkan kategori selengkapnya',
+                        ? _t(
+                            'Sembunyikan sebagian kategori',
+                            'Hide some categories',
+                          )
+                        : _t(
+                            'Tampilkan kategori selengkapnya',
+                            'Show all categories',
+                          ),
                     style: const TextStyle(color: Color(0xFF4F6EF7)),
                   ),
                 ),
@@ -197,12 +209,10 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (_amountController.text.isEmpty) return;
-                    final digits = _amountController.text.replaceAll(
-                      RegExp(r'[^0-9]'),
-                      '',
+                    final amount = CurrencySettings.parseInputToIdr(
+                      _amountController.text,
                     );
-                    if (digits.isEmpty) return;
-                    final amount = double.parse(digits);
+                    if (amount <= 0) return;
                     await ref
                         .read(budgetNotifierProvider.notifier)
                         .upsertBudget(_selectedCategory, amount);
@@ -212,8 +222,8 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                   ),
-                  child: const Text(
-                    'Simpan Budget',
+                  child: Text(
+                    _t('Simpan Budget', 'Save Budget'),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -230,7 +240,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
   }
 }
 
-class _IdrThousandsFormatter extends TextInputFormatter {
+class _CurrencyThousandsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,

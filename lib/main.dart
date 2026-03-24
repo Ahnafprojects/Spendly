@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'shared/services/currency_settings.dart';
+import 'shared/services/language_settings.dart';
 import 'shared/services/notification_service.dart';
 
 const _fallbackSupabaseUrl = 'https://bmnwttcpnfadbauwodxl.supabase.co';
@@ -26,8 +29,11 @@ void main() async {
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
 
-  await initializeDateFormatting('id_ID');
-  await CurrencySettings.load();
+  await initializeDateFormatting();
+  await LanguageSettings.load(deviceLocale: PlatformDispatcher.instance.locale);
+  await CurrencySettings.load(
+    deviceLocaleTag: PlatformDispatcher.instance.locale.toLanguageTag(),
+  );
 
   await NotificationService.initialize();
 
@@ -48,6 +54,8 @@ class SpendlyApp extends ConsumerWidget {
     // Membaca state router dan tema dari provider yang sudah kita buat
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeProvider);
+    final appLocale = ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
 
     return MaterialApp.router(
       title: 'Spendly',
@@ -58,8 +66,8 @@ class SpendlyApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode, // Menggunakan state dari ThemeNotifier
 
-      locale: const Locale('id', 'ID'),
-      supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
+      locale: appLocale,
+      supportedLocales: LanguageSettings.supportedLocales,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

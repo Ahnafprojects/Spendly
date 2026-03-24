@@ -5,14 +5,19 @@ import '../models/budget_usage_model.dart';
 import '../budget_notifier.dart';
 import '../widgets/add_budget_sheet.dart';
 import '../widgets/budget_card.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_shimmer.dart';
 
 class BudgetScreen extends ConsumerWidget {
   const BudgetScreen({super.key});
 
+  String _t(String id, String en) => AppText.t(id: id, en: en);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(appCurrencyProvider);
     final budgetState = ref.watch(budgetNotifierProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -24,7 +29,7 @@ class BudgetScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Budget Tracker',
+          _t('Pelacak Budget', 'Budget Tracker'),
           style: TextStyle(
             color: isDark ? Colors.white : const Color(0xFF1A1E2A),
             fontWeight: FontWeight.bold,
@@ -46,7 +51,7 @@ class BudgetScreen extends ConsumerWidget {
           ),
           error: (err, _) => Center(
             child: Text(
-              'Error: $err',
+              '${_t('Error', 'Error')}: $err',
               style: const TextStyle(color: Colors.red),
             ),
           ),
@@ -87,7 +92,7 @@ class BudgetScreen extends ConsumerWidget {
                     ),
                   const SizedBox(height: 32),
                   Text(
-                    'Budget per Kategori',
+                    _t('Budget per Kategori', 'Budget by Category'),
                     style: TextStyle(
                       color: title,
                       fontSize: 18,
@@ -112,7 +117,7 @@ class BudgetScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Belum ada budget diset',
+                      _t('Belum ada budget diset', 'No budgets set yet'),
                       style: TextStyle(color: muted, fontSize: 16),
                     ),
                     const SizedBox(height: 16),
@@ -123,8 +128,8 @@ class BudgetScreen extends ConsumerWidget {
                             ? const Color(0xFF1C1C2E)
                             : Colors.white,
                       ),
-                      child: const Text(
-                        'Set Budget Pertama',
+                      child: Text(
+                        _t('Set Budget Pertama', 'Set Your First Budget'),
                         style: TextStyle(color: Color(0xFF4F6EF7)),
                       ),
                     ),
@@ -169,7 +174,8 @@ class BudgetScreen extends ConsumerWidget {
   }) {
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
     final muted = isDark ? Colors.white54 : const Color(0xFF6D7892);
-    final monthStr = DateFormat('MMMM yyyy', 'id_ID').format(currentMonth);
+    final locale = LanguageSettings.current.locale.toString();
+    final monthStr = DateFormat('MMMM yyyy', locale).format(currentMonth);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -207,7 +213,6 @@ class BudgetScreen extends ConsumerWidget {
   }) {
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
     final muted = isDark ? Colors.white70 : const Color(0xFF5B6275);
-    final currencyFormat = CurrencySettings.compactFormatter();
     Color barColor = const Color(0xFF00D4AA);
     if (usagePct >= 0.9) {
       barColor = const Color(0xFFFF4C4C);
@@ -232,12 +237,12 @@ class BudgetScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Budget Bulan Ini',
+            _t('Total Budget Bulan Ini', 'Total Budget This Month'),
             style: TextStyle(color: muted, fontSize: 14),
           ),
           const SizedBox(height: 8),
           Text(
-            currencyFormat.format(totalLimit),
+            CurrencySettings.formatCompact(totalLimit),
             style: TextStyle(
               color: title,
               fontSize: 32,
@@ -249,7 +254,7 @@ class BudgetScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Terpakai: ${currencyFormat.format(totalSpent)}',
+                '${_t('Terpakai', 'Used')}: ${CurrencySettings.formatCompact(totalSpent)}',
                 style: TextStyle(color: muted, fontSize: 12),
               ),
               Text(
@@ -320,7 +325,7 @@ class BudgetScreen extends ConsumerWidget {
                     color: isDark ? Colors.white : const Color(0xFF1A1E2A),
                   ),
                   title: Text(
-                    'Edit Budget',
+                    _t('Edit Budget', 'Edit Budget'),
                     style: TextStyle(
                       color: isDark ? Colors.white : const Color(0xFF1A1E2A),
                     ),
@@ -339,8 +344,8 @@ class BudgetScreen extends ConsumerWidget {
                     Icons.delete_outline_rounded,
                     color: Colors.redAccent,
                   ),
-                  title: const Text(
-                    'Hapus Budget',
+                  title: Text(
+                    _t('Hapus Budget', 'Delete Budget'),
                     style: TextStyle(color: Colors.redAccent),
                   ),
                   onTap: () async {

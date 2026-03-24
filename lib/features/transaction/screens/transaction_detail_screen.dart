@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
+import '../../../shared/constants/transaction_categories.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../transaction_repository.dart';
 import 'add_transaction_screen.dart';
@@ -19,6 +22,7 @@ class TransactionDetailScreen extends ConsumerStatefulWidget {
 class _TransactionDetailScreenState
     extends ConsumerState<TransactionDetailScreen> {
   bool _deleting = false;
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   Future<void> _onEdit() async {
     final result = await Navigator.of(context).push(
@@ -37,16 +41,21 @@ class _TransactionDetailScreenState
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Hapus transaksi?'),
-        content: const Text('Transaksi ini akan dihapus permanen.'),
+        title: Text(_t('Hapus transaksi?', 'Delete transaction?')),
+        content: Text(
+          _t(
+            'Transaksi ini akan dihapus permanen.',
+            'This transaction will be deleted permanently.',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: Text(_t('Batal', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: Text(_t('Hapus', 'Delete')),
           ),
         ],
       ),
@@ -59,17 +68,22 @@ class _TransactionDetailScreenState
           .read(transactionRepositoryProvider)
           .delete(widget.transaction.id);
       if (!mounted) return;
-      AppNotice.info(context, 'Transaksi dihapus');
+      AppNotice.info(context, _t('Transaksi dihapus', 'Transaction deleted'));
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      AppNotice.error(context, 'Gagal hapus transaksi: $e');
+      AppNotice.error(
+        context,
+        '${_t('Gagal hapus transaksi', 'Failed to delete transaction')}: $e',
+      );
       setState(() => _deleting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final tx = widget.transaction;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF090B14) : const Color(0xFFF4F7FC);
@@ -89,14 +103,14 @@ class _TransactionDetailScreenState
         : tx.date;
     final date = DateFormat(
       'dd MMM yyyy, HH:mm:ss',
-      'id_ID',
+      LanguageSettings.current.locale.toString(),
     ).format(displayDate);
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Detail Transaksi'),
+        title: Text(_t('Detail Transaksi', 'Transaction Detail')),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
@@ -120,16 +134,23 @@ class _TransactionDetailScreenState
                   ),
                 ),
                 const SizedBox(height: 12),
-                _infoRow('Kategori', tx.category, muted, title),
                 _infoRow(
-                  'Tipe',
-                  tx.type == 'income' ? 'Income' : 'Expense',
+                  _t('Kategori', 'Category'),
+                  localizeCategory(tx.category),
                   muted,
                   title,
                 ),
-                _infoRow('Waktu', date, muted, title),
                 _infoRow(
-                  'Catatan',
+                  _t('Tipe', 'Type'),
+                  tx.type == 'income'
+                      ? _t('Pemasukan', 'Income')
+                      : _t('Pengeluaran', 'Expense'),
+                  muted,
+                  title,
+                ),
+                _infoRow(_t('Waktu', 'Time'), date, muted, title),
+                _infoRow(
+                  _t('Catatan', 'Note'),
                   tx.note?.isNotEmpty == true ? tx.note! : '-',
                   muted,
                   title,
@@ -143,7 +164,7 @@ class _TransactionDetailScreenState
             child: OutlinedButton.icon(
               onPressed: _onEdit,
               icon: const Icon(Icons.edit_rounded),
-              label: const Text('Edit Transaksi'),
+              label: Text(_t('Edit Transaksi', 'Edit Transaction')),
             ),
           ),
           const SizedBox(height: 10),
@@ -164,7 +185,11 @@ class _TransactionDetailScreenState
                       ),
                     )
                   : const Icon(Icons.delete_outline_rounded),
-              label: Text(_deleting ? 'Menghapus...' : 'Hapus Transaksi'),
+              label: Text(
+                _deleting
+                    ? _t('Menghapus...', 'Deleting...')
+                    : _t('Hapus Transaksi', 'Delete Transaction'),
+              ),
             ),
           ),
         ],

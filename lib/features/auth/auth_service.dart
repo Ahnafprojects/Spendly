@@ -14,17 +14,14 @@ class AuthService {
   // Fungsi Login
   Future<AuthResponse> signIn(String email, String password) async {
     return await _supabase.auth.signInWithPassword(
-      email: email, 
+      email: email,
       password: password,
     );
   }
 
   // Fungsi Register
   Future<AuthResponse> signUp(String email, String password) async {
-    return await _supabase.auth.signUp(
-      email: email, 
-      password: password,
-    );
+    return await _supabase.auth.signUp(email: email, password: password);
   }
 
   // Fungsi Logout

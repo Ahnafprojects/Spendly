@@ -39,12 +39,10 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
   Future<void> deleteTransaction(String id) async {
     // Simpan data lama untuk berjaga-jaga jika proses hapus gagal
     final previousState = state;
-    
+
     // Update UI duluan (Optimistic update) biar terasa cepat
     if (state.hasValue) {
-      state = AsyncValue.data(
-        state.value!.where((tx) => tx.id != id).toList()
-      );
+      state = AsyncValue.data(state.value!.where((tx) => tx.id != id).toList());
     }
 
     try {
@@ -59,5 +57,5 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
 
 final transactionNotifierProvider =
     AsyncNotifierProvider<TransactionNotifier, List<TransactionModel>>(() {
-  return TransactionNotifier();
-});
+      return TransactionNotifier();
+    });

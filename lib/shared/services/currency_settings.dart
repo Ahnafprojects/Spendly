@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CurrencyOption {
@@ -7,6 +8,7 @@ class CurrencyOption {
   final String locale;
   final String symbol;
   final int decimalDigits;
+  final double rateToIdr;
 
   const CurrencyOption({
     required this.code,
@@ -14,6 +16,7 @@ class CurrencyOption {
     required this.locale,
     required this.symbol,
     required this.decimalDigits,
+    required this.rateToIdr,
   });
 }
 
@@ -27,6 +30,7 @@ class CurrencySettings {
       locale: 'id_ID',
       symbol: 'Rp ',
       decimalDigits: 0,
+      rateToIdr: 1,
     ),
     CurrencyOption(
       code: 'USD',
@@ -34,6 +38,31 @@ class CurrencySettings {
       locale: 'en_US',
       symbol: '\$',
       decimalDigits: 2,
+      rateToIdr: 15500,
+    ),
+    CurrencyOption(
+      code: 'AUD',
+      label: 'Australian Dollar',
+      locale: 'en_AU',
+      symbol: 'A\$',
+      decimalDigits: 2,
+      rateToIdr: 10200,
+    ),
+    CurrencyOption(
+      code: 'CAD',
+      label: 'Canadian Dollar',
+      locale: 'en_CA',
+      symbol: 'C\$',
+      decimalDigits: 2,
+      rateToIdr: 11400,
+    ),
+    CurrencyOption(
+      code: 'GBP',
+      label: 'British Pound',
+      locale: 'en_GB',
+      symbol: '£',
+      decimalDigits: 2,
+      rateToIdr: 19800,
     ),
     CurrencyOption(
       code: 'EUR',
@@ -41,6 +70,7 @@ class CurrencySettings {
       locale: 'de_DE',
       symbol: '€',
       decimalDigits: 2,
+      rateToIdr: 16900,
     ),
     CurrencyOption(
       code: 'SGD',
@@ -48,6 +78,31 @@ class CurrencySettings {
       locale: 'en_SG',
       symbol: 'S\$',
       decimalDigits: 2,
+      rateToIdr: 11500,
+    ),
+    CurrencyOption(
+      code: 'MYR',
+      label: 'Malaysian Ringgit',
+      locale: 'ms_MY',
+      symbol: 'RM',
+      decimalDigits: 2,
+      rateToIdr: 3300,
+    ),
+    CurrencyOption(
+      code: 'THB',
+      label: 'Thai Baht',
+      locale: 'th_TH',
+      symbol: '฿',
+      decimalDigits: 2,
+      rateToIdr: 430,
+    ),
+    CurrencyOption(
+      code: 'CNY',
+      label: 'Chinese Yuan',
+      locale: 'zh_CN',
+      symbol: '¥',
+      decimalDigits: 2,
+      rateToIdr: 2150,
     ),
     CurrencyOption(
       code: 'JPY',
@@ -55,6 +110,31 @@ class CurrencySettings {
       locale: 'ja_JP',
       symbol: '¥',
       decimalDigits: 0,
+      rateToIdr: 105,
+    ),
+    CurrencyOption(
+      code: 'KRW',
+      label: 'South Korean Won',
+      locale: 'ko_KR',
+      symbol: '₩',
+      decimalDigits: 0,
+      rateToIdr: 11.5,
+    ),
+    CurrencyOption(
+      code: 'INR',
+      label: 'Indian Rupee',
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 2,
+      rateToIdr: 186,
+    ),
+    CurrencyOption(
+      code: 'AED',
+      label: 'UAE Dirham',
+      locale: 'ar_AE',
+      symbol: 'AED',
+      decimalDigits: 2,
+      rateToIdr: 4220,
     ),
   ];
 
@@ -62,10 +142,15 @@ class CurrencySettings {
 
   static CurrencyOption get current => _current;
 
-  static Future<void> load() async {
+  static Future<void> load({String? deviceLocaleTag}) async {
     final prefs = await SharedPreferences.getInstance();
     final savedCode = prefs.getString(_kCurrencyCode);
-    _current = byCode(savedCode) ?? options.first;
+    if (savedCode != null && savedCode.isNotEmpty) {
+      _current = byCode(savedCode) ?? options.first;
+      return;
+    }
+
+    _current = byLocaleTag(deviceLocaleTag) ?? options.first;
   }
 
   static Future<void> setCurrencyCode(String code) async {
@@ -83,6 +168,21 @@ class CurrencySettings {
     return null;
   }
 
+  static CurrencyOption? byLocaleTag(String? localeTag) {
+    if (localeTag == null || localeTag.isEmpty) return null;
+    final normalized = localeTag.replaceAll('-', '_').toLowerCase();
+
+    for (final item in options) {
+      if (item.locale.toLowerCase() == normalized) return item;
+    }
+
+    final language = normalized.split('_').first;
+    for (final item in options) {
+      if (item.locale.toLowerCase().startsWith('${language}_')) return item;
+    }
+    return null;
+  }
+
   static NumberFormat moneyFormatter({int? decimalDigits}) {
     return NumberFormat.currency(
       locale: _current.locale,
@@ -91,8 +191,25 @@ class CurrencySettings {
     );
   }
 
+  static double fromIdr(num amountIdr) {
+    return amountIdr / _current.rateToIdr;
+  }
+
+  static double toIdr(num amountInCurrentCurrency) {
+    return amountInCurrentCurrency * _current.rateToIdr;
+  }
+
+  static String formatFromCurrent(
+    num amountInCurrentCurrency, {
+    int? decimalDigits,
+  }) {
+    return moneyFormatter(
+      decimalDigits: decimalDigits,
+    ).format(amountInCurrentCurrency);
+  }
+
   static String format(num amount, {int? decimalDigits}) {
-    return moneyFormatter(decimalDigits: decimalDigits).format(amount);
+    return moneyFormatter(decimalDigits: decimalDigits).format(fromIdr(amount));
   }
 
   static NumberFormat compactFormatter() {
@@ -102,7 +219,40 @@ class CurrencySettings {
     );
   }
 
+  static String formatCompact(num amount) {
+    return compactFormatter().format(fromIdr(amount));
+  }
+
   static NumberFormat decimalFormatter() {
     return NumberFormat.decimalPattern(_current.locale);
   }
+
+  static String formatInputFromIdr(num amount) {
+    final converted = fromIdr(amount);
+    return decimalFormatter().format(converted.round());
+  }
+
+  static double parseInputToIdr(String text) {
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return 0;
+    return toIdr(double.parse(digits));
+  }
 }
+
+class AppCurrencyNotifier extends Notifier<String> {
+  @override
+  String build() => CurrencySettings.current.code;
+
+  Future<void> setCurrency(String code) async {
+    await CurrencySettings.setCurrencyCode(code);
+    state = CurrencySettings.current.code;
+  }
+
+  void refreshFromSettings() {
+    state = CurrencySettings.current.code;
+  }
+}
+
+final appCurrencyProvider = NotifierProvider<AppCurrencyNotifier, String>(() {
+  return AppCurrencyNotifier();
+});

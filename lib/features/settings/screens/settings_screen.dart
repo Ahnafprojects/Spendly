@@ -10,7 +10,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/services/offline_store.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../auth/auth_notifier.dart';
@@ -31,6 +33,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _budgetAlert = true;
   bool _busy = false;
   String _currencyCode = CurrencySettings.current.code;
+  String _languageCode = LanguageSettings.current.code;
+
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _pushNotif = prefs.getBool(_kPushNotif) ?? true;
       _budgetAlert = prefs.getBool(_kBudgetAlert) ?? true;
       _currencyCode = CurrencySettings.current.code;
+      _languageCode = LanguageSettings.current.code;
     });
   }
 
@@ -78,7 +84,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 subtitle: Text(
-                  'Bisa dibuka di Excel / Google Sheets',
+                  _t(
+                    'Bisa dibuka di Excel / Google Sheets',
+                    'Can be opened in Excel / Google Sheets',
+                  ),
                   style: TextStyle(
                     color: isDark ? Colors.white54 : const Color(0xFF5B6275),
                   ),
@@ -110,7 +119,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 subtitle: Text(
-                  'Laporan ringkas transaksi dan budget',
+                  _t(
+                    'Laporan ringkas transaksi dan budget',
+                    'Compact transaction and budget report',
+                  ),
                   style: TextStyle(
                     color: isDark ? Colors.white54 : const Color(0xFF5B6275),
                   ),
@@ -131,7 +143,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User belum login');
+      if (userId == null)
+        throw Exception(_t('User belum login', 'User is not logged in'));
 
       final tx = await Supabase.instance.client
           .from('transactions')
@@ -160,7 +173,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final file = File('${dir.path}/spendly_export_$ts.$ext');
         await file.writeAsString(content);
         if (!mounted) return;
-        AppNotice.success(context, 'Export sukses: ${file.path}');
+        AppNotice.success(
+          context,
+          '${_t('Export sukses', 'Export success')}: ${file.path}',
+        );
       } else if (format == 'csv') {
         ext = 'csv';
         final rows = <String>[
@@ -192,7 +208,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final file = File('${dir.path}/spendly_export_$ts.$ext');
         await file.writeAsString(content);
         if (!mounted) return;
-        AppNotice.success(context, 'Export sukses: ${file.path}');
+        AppNotice.success(
+          context,
+          '${_t('Export sukses', 'Export success')}: ${file.path}',
+        );
       } else {
         ext = 'pdf';
         final document = pw.Document();
@@ -219,23 +238,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               pw.Text('User ID: $userId'),
               pw.SizedBox(height: 12),
               pw.Text(
-                'Ringkasan',
+                _t('Ringkasan', 'Summary'),
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              pw.Bullet(text: 'Total transaksi: ${txList.length}'),
               pw.Bullet(
-                text: 'Total income: ${CurrencySettings.format(totalIncome)}',
+                text:
+                    '${_t('Total transaksi', 'Total transactions')}: ${txList.length}',
               ),
               pw.Bullet(
-                text: 'Total expense: ${CurrencySettings.format(totalExpense)}',
+                text:
+                    '${_t('Total pemasukan', 'Total income')}: ${CurrencySettings.format(totalIncome)}',
               ),
-              pw.Bullet(text: 'Total budget: ${budgetList.length}'),
+              pw.Bullet(
+                text:
+                    '${_t('Total pengeluaran', 'Total expense')}: ${CurrencySettings.format(totalExpense)}',
+              ),
+              pw.Bullet(
+                text:
+                    '${_t('Total budget', 'Total budgets')}: ${budgetList.length}',
+              ),
               pw.SizedBox(height: 12),
               pw.Text(
-                '5 Transaksi Terbaru',
+                _t('5 Transaksi Terbaru', '5 Latest Transactions'),
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
@@ -256,11 +283,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final file = File('${dir.path}/spendly_export_$ts.$ext');
         await file.writeAsBytes(bytes, flush: true);
         if (!mounted) return;
-        AppNotice.success(context, 'Export PDF sukses: ${file.path}');
+        AppNotice.success(
+          context,
+          '${_t('Export PDF sukses', 'PDF export success')}: ${file.path}',
+        );
       }
     } catch (e) {
       if (!mounted) return;
-      AppNotice.error(context, 'Gagal export data: $e');
+      AppNotice.error(
+        context,
+        '${_t('Gagal export data', 'Failed to export data')}: $e',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -275,18 +308,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Hapus Semua Data?'),
-        content: const Text(
-          'Semua transaksi dan budget kamu akan dihapus permanen. Lanjutkan?',
+        title: Text(_t('Hapus Semua Data?', 'Delete All Data?')),
+        content: Text(
+          _t(
+            'Semua transaksi dan budget kamu akan dihapus permanen. Lanjutkan?',
+            'All your transactions and budgets will be permanently deleted. Continue?',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+            child: Text(_t('Batal', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
+            child: Text(_t('Hapus', 'Delete')),
           ),
         ],
       ),
@@ -296,7 +332,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('User belum login');
+      if (userId == null)
+        throw Exception(_t('User belum login', 'User is not logged in'));
 
       await OfflineStore().clearUserData(userId);
       try {
@@ -313,10 +350,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
 
       if (!mounted) return;
-      AppNotice.success(context, 'Semua data lokal berhasil dihapus');
+      AppNotice.success(
+        context,
+        _t(
+          'Semua data lokal berhasil dihapus',
+          'All local data has been deleted',
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      AppNotice.error(context, 'Gagal hapus data: $e');
+      AppNotice.error(
+        context,
+        '${_t('Gagal hapus data', 'Failed to delete data')}: $e',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -329,21 +375,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Ganti Password'),
+          title: Text(_t('Ganti Password', 'Change Password')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: passController,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password Baru'),
+                decoration: InputDecoration(
+                  labelText: _t('Password Baru', 'New Password'),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: confirmController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Konfirmasi Password',
+                decoration: InputDecoration(
+                  labelText: _t('Konfirmasi Password', 'Confirm Password'),
                 ),
               ),
             ],
@@ -351,11 +399,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal'),
+              child: Text(_t('Batal', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Simpan'),
+              child: Text(_t('Simpan', 'Save')),
             ),
           ],
         ),
@@ -366,21 +414,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final pass = passController.text.trim();
       final confirm = confirmController.text.trim();
       if (pass.length < 8) {
-        AppNotice.warning(context, 'Password minimal 8 karakter');
+        AppNotice.warning(
+          context,
+          _t(
+            'Password minimal 8 karakter',
+            'Password must be at least 8 characters',
+          ),
+        );
         return;
       }
       if (pass != confirm) {
-        AppNotice.warning(context, 'Konfirmasi password tidak cocok');
+        AppNotice.warning(
+          context,
+          _t(
+            'Konfirmasi password tidak cocok',
+            'Password confirmation does not match',
+          ),
+        );
         return;
       }
 
       setState(() => _busy = true);
       await ref.read(authServiceProvider).updatePassword(pass);
       if (!mounted) return;
-      AppNotice.success(context, 'Password berhasil diperbarui');
+      AppNotice.success(
+        context,
+        _t('Password berhasil diperbarui', 'Password updated successfully'),
+      );
     } catch (e) {
       if (!mounted) return;
-      AppNotice.error(context, 'Gagal ganti password: $e');
+      AppNotice.error(
+        context,
+        '${_t('Gagal ganti password', 'Failed to change password')}: $e',
+      );
     } finally {
       passController.dispose();
       confirmController.dispose();
@@ -415,10 +481,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     if (!mounted || selected == null || selected == _currencyCode) return;
-    await CurrencySettings.setCurrencyCode(selected);
+    await ref.read(appCurrencyProvider.notifier).setCurrency(selected);
     if (!mounted) return;
     setState(() => _currencyCode = selected);
-    AppNotice.success(context, 'Mata uang diubah ke $selected');
+    AppNotice.success(
+      context,
+      '${_t('Mata uang diubah ke', 'Currency changed to')} $selected',
+    );
+  }
+
+  Future<void> _pickLanguage() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: LanguageSettings.options.map((option) {
+              final active = option.code == _languageCode;
+              final cc = option.locale.countryCode;
+              final localeText = cc == null
+                  ? option.locale.languageCode
+                  : '${option.locale.languageCode}_$cc';
+              return ListTile(
+                title: Text(option.label),
+                subtitle: Text(localeText),
+                trailing: active
+                    ? const Icon(Icons.check_circle, color: Color(0xFF2E90FA))
+                    : null,
+                onTap: () => Navigator.pop(context, option.code),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null || selected == _languageCode) return;
+    await ref.read(appLanguageProvider.notifier).setLanguage(selected);
+    if (!mounted) return;
+    setState(() => _languageCode = selected);
+    AppNotice.success(
+      context,
+      '${_t('Bahasa diubah ke', 'Language changed to')} ${selected.toUpperCase()}',
+    );
   }
 
   @override
@@ -435,7 +544,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(_t('Pengaturan', 'Settings')),
         backgroundColor: Colors.transparent,
       ),
       body: ListView(
@@ -469,8 +578,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Akun Kamu',
+                      Text(
+                        _t('Akun Kamu', 'Your Account'),
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
@@ -487,11 +596,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _sectionTitle('Preferences'),
+          _sectionTitle(_t('Preferensi', 'Preferences')),
           _tile(
             icon: Icons.dark_mode_rounded,
-            title: 'Dark Mode',
-            subtitle: 'Atur mode tema aplikasi',
+            title: _t('Mode Gelap', 'Dark Mode'),
+            subtitle: _t('Atur mode tema aplikasi', 'Adjust app theme mode'),
             trailing: Switch(
               value: isDark,
               onChanged: (v) => ref
@@ -501,14 +610,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _tile(
             icon: Icons.attach_money_rounded,
-            title: 'Mata Uang',
+            title: _t('Mata Uang', 'Currency'),
             subtitle: _currencyCode,
             onTap: _pickCurrency,
           ),
           _tile(
+            icon: Icons.language_rounded,
+            title: _t('Bahasa', 'Language'),
+            subtitle:
+                LanguageSettings.byCode(_languageCode)?.label ??
+                _languageCode.toUpperCase(),
+            onTap: _pickLanguage,
+          ),
+          _tile(
             icon: Icons.notifications_active_rounded,
-            title: 'Push Notification',
-            subtitle: 'Aktif/nonaktif notifikasi aplikasi',
+            title: _t('Notifikasi Push', 'Push Notifications'),
+            subtitle: _t(
+              'Aktif/nonaktif notifikasi aplikasi',
+              'Enable/disable app notifications',
+            ),
             trailing: Switch(
               value: _pushNotif,
               onChanged: (v) {
@@ -519,8 +639,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _tile(
             icon: Icons.savings_rounded,
-            title: 'Budget Alerts',
-            subtitle: 'Notifikasi budget hampir habis',
+            title: _t('Peringatan Budget', 'Budget Alerts'),
+            subtitle: _t(
+              'Notifikasi budget hampir habis',
+              'Alerts when budget is near limit',
+            ),
             trailing: Switch(
               value: _budgetAlert,
               onChanged: (v) {
@@ -530,30 +653,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _sectionTitle('Data & Security'),
+          _sectionTitle(_t('Data & Keamanan', 'Data & Security')),
           _tile(
             icon: Icons.file_download_rounded,
-            title: 'Export Data',
-            subtitle: 'Pilih format Excel / JSON / PDF',
+            title: _t('Ekspor Data', 'Export Data'),
+            subtitle: _t(
+              'Pilih format Excel / JSON / PDF',
+              'Choose Excel / JSON / PDF format',
+            ),
             onTap: _busy ? null : _exportData,
           ),
           _tile(
             icon: Icons.vpn_key_rounded,
-            title: 'Change Password',
-            subtitle: 'Ganti password akun kamu',
+            title: _t('Ganti Password', 'Change Password'),
+            subtitle: _t(
+              'Ganti password akun kamu',
+              'Change your account password',
+            ),
             onTap: _busy ? null : _changePassword,
           ),
           _tile(
             icon: Icons.delete_forever_rounded,
-            title: 'Clear All Data',
-            subtitle: 'Hapus semua transaksi dan budget',
+            title: _t('Hapus Semua Data', 'Clear All Data'),
+            subtitle: _t(
+              'Hapus semua transaksi dan budget',
+              'Delete all transactions and budgets',
+            ),
             onTap: _busy ? null : _clearAllData,
           ),
           const SizedBox(height: 14),
-          _sectionTitle('About'),
+          _sectionTitle(_t('Tentang', 'About')),
           _tile(
             icon: Icons.info_outline_rounded,
-            title: 'App Version',
+            title: _t('Versi Aplikasi', 'App Version'),
             subtitle: 'Spendly v1.0.0',
           ),
           const SizedBox(height: 20),
@@ -574,8 +706,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 context.goNamed('auth');
               },
               icon: const Icon(Icons.logout_rounded, color: Color(0xFFFF5A6E)),
-              label: const Text(
-                'Logout',
+              label: Text(
+                _t('Keluar', 'Logout'),
                 style: TextStyle(
                   color: Color(0xFFFF5A6E),
                   fontWeight: FontWeight.w700,

@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../transaction/transaction_notifier.dart';
 import '../../transaction/screens/transaction_detail_screen.dart';
@@ -19,6 +21,9 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
+    String t(String id, String en) => AppText.t(id: id, en: en);
     final transactionState = ref.watch(transactionNotifierProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF4F7FC);
@@ -88,7 +93,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         error: (err, stack) => Text(
-                          'Error: $err',
+                          '${t('Error', 'Error')}: $err',
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
@@ -104,7 +109,7 @@ class DashboardScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Recent Transactions',
+                            t('Transaksi Terbaru', 'Recent Transactions'),
                             style: TextStyle(
                               color: title,
                               fontSize: 18,
@@ -113,8 +118,8 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                           TextButton(
                             onPressed: () => context.push('/transactions'),
-                            child: const Text(
-                              'See All',
+                            child: Text(
+                              t('Lihat Semua', 'See All'),
                               style: TextStyle(color: Color(0xFF4F6EF7)),
                             ),
                           ),
@@ -130,7 +135,7 @@ class DashboardScreen extends ConsumerWidget {
               transactionState.when(
                 data: (transactions) {
                   if (transactions.isEmpty) {
-                    return _buildEmptyState(isDark: isDark);
+                    return _buildEmptyState(isDark: isDark, t: t);
                   }
                   return SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
@@ -171,8 +176,11 @@ class DashboardScreen extends ConsumerWidget {
     final userEmail = Supabase.instance.client.auth.currentUser?.email;
     final displayName = (userEmail != null && userEmail.isNotEmpty)
         ? userEmail.split('@').first
-        : 'Pengguna';
-    final dateLabel = DateFormat('EEEE, d MMM', 'id_ID').format(DateTime.now());
+        : AppText.t(id: 'Pengguna', en: 'User');
+    final dateLabel = DateFormat(
+      'EEEE, d MMM',
+      LanguageSettings.current.locale.toString(),
+    ).format(DateTime.now());
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -183,7 +191,7 @@ class DashboardScreen extends ConsumerWidget {
             Text(dateLabel, style: TextStyle(color: muted, fontSize: 13)),
             const SizedBox(height: 4),
             Text(
-              'Hi, $displayName',
+              '${AppText.t(id: 'Halo', en: 'Hi')}, $displayName',
               style: TextStyle(
                 color: title,
                 fontSize: 22,
@@ -249,7 +257,7 @@ class DashboardScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Balance',
+            AppText.t(id: 'Total Saldo', en: 'Total Balance'),
             style: TextStyle(
               color: isDark ? Colors.white70 : const Color(0xFF5B6275),
               fontSize: 13,
@@ -277,7 +285,7 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildIncomeExpense(
-                  'Income',
+                  AppText.t(id: 'Pemasukan', en: 'Income'),
                   totalIncome,
                   true,
                   isDark: isDark,
@@ -286,7 +294,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildIncomeExpense(
-                  'Expense',
+                  AppText.t(id: 'Pengeluaran', en: 'Expense'),
                   totalExpense,
                   false,
                   isDark: isDark,
@@ -363,37 +371,37 @@ class DashboardScreen extends ConsumerWidget {
     final items = [
       (
         icon: Icons.add_rounded,
-        label: 'Add',
+        label: AppText.t(id: 'Tambah', en: 'Add'),
         color: const Color(0xFF4F6EF7),
         onTap: () => context.pushNamed('add-transaction'),
       ),
       (
         icon: Icons.savings_rounded,
-        label: 'Goals',
+        label: AppText.t(id: 'Target', en: 'Goals'),
         color: const Color(0xFF00D4AA),
         onTap: () => context.pushNamed('transfer'),
       ),
       (
         icon: Icons.receipt_long_rounded,
-        label: 'Bills',
+        label: AppText.t(id: 'Tagihan', en: 'Bills'),
         color: const Color(0xFFFFB020),
         onTap: () => context.push('/transactions'),
       ),
       (
         icon: Icons.bar_chart_rounded,
-        label: 'Analytics',
+        label: AppText.t(id: 'Analitik', en: 'Analytics'),
         color: const Color(0xFF22C1C3),
         onTap: () => context.pushNamed('analytics'),
       ),
       (
         icon: Icons.account_balance_wallet_rounded,
-        label: 'Budget',
+        label: AppText.t(id: 'Budget', en: 'Budget'),
         color: const Color(0xFF8B5CF6),
         onTap: () => context.pushNamed('budget'),
       ),
       (
         icon: Icons.settings_rounded,
-        label: 'Settings',
+        label: AppText.t(id: 'Pengaturan', en: 'Settings'),
         color: const Color(0xFF8B5CF6),
         onTap: () => context.pushNamed('settings'),
       ),
@@ -461,7 +469,10 @@ class DashboardScreen extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Belum ada goals. Tap untuk buat target nabung pertama.',
+                      AppText.t(
+                        id: 'Belum ada target. Ketuk untuk membuat target pertama.',
+                        en: 'No goals yet. Tap to create your first savings goal.',
+                      ),
                       style: TextStyle(color: muted, fontSize: 12.5),
                     ),
                   ),
@@ -500,7 +511,7 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Top Goal: ${goal.title}',
+                        '${AppText.t(id: 'Target Utama', en: 'Top Goal')}: ${goal.title}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -605,7 +616,10 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState({required bool isDark}) {
+  Widget _buildEmptyState({
+    required bool isDark,
+    required String Function(String, String) t,
+  }) {
     return SliverToBoxAdapter(
       child: Center(
         child: Padding(
@@ -619,7 +633,7 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Belum ada transaksi',
+                t('Belum ada transaksi', 'No transactions yet'),
                 style: TextStyle(
                   color: isDark ? Colors.white54 : const Color(0xFF5B6275),
                   fontSize: 16,
@@ -647,7 +661,10 @@ class DashboardScreen extends ConsumerWidget {
         : const Color(0xFFFF4C4C);
     final sign = isIncome ? '+' : '-';
     final formattedAmount = CurrencySettings.format(tx.amount);
-    final formattedDate = DateFormat('dd MMM yyyy').format(tx.date);
+    final formattedDate = DateFormat(
+      'dd MMM yyyy',
+      LanguageSettings.current.locale.toString(),
+    ).format(tx.date);
 
     final categoryIcon = categoryIconFor(tx.category);
 
@@ -666,7 +683,10 @@ class DashboardScreen extends ConsumerWidget {
       ),
       onDismissed: (direction) {
         ref.read(transactionNotifierProvider.notifier).deleteTransaction(tx.id);
-        AppNotice.info(context, 'Transaksi dihapus');
+        AppNotice.info(
+          context,
+          AppText.t(id: 'Transaksi dihapus', en: 'Transaction deleted'),
+        );
       },
       child: InkWell(
         onTap: () async {
@@ -714,7 +734,7 @@ class DashboardScreen extends ConsumerWidget {
                     Text(
                       tx.note != null && tx.note!.isNotEmpty
                           ? tx.note!
-                          : tx.category,
+                          : localizeCategory(tx.category),
                       style: TextStyle(
                         color: title,
                         fontSize: 16,
@@ -725,7 +745,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${tx.category} • $formattedDate',
+                      '${localizeCategory(tx.category)} • $formattedDate',
                       style: TextStyle(color: muted, fontSize: 12),
                     ),
                   ],
