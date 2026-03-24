@@ -53,7 +53,7 @@ jobs:
 
       - name: Build AppBundle (AAB)
         env:
-          KEYSTORE_PATH: android/app/keystore.jks
+          KEYSTORE_PATH: keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -70,7 +70,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack Notification (Success)
-        if: success()
+        if: success() && secrets.SLACK_WEBHOOK_URL != ''
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -79,7 +79,7 @@ jobs:
           SLACK_TITLE: Deployment Success
 
       - name: Slack Notification (Failure)
-        if: failure()
+        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
