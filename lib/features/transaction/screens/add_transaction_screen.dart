@@ -335,7 +335,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                             )
                           : Text(
                               _t('Simpan', 'Save'),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,

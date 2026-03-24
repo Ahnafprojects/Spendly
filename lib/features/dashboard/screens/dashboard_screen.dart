@@ -120,7 +120,9 @@ class DashboardScreen extends ConsumerWidget {
                             onPressed: () => context.push('/transactions'),
                             child: Text(
                               t('Lihat Semua', 'See All'),
-                              style: TextStyle(color: Color(0xFF4F6EF7)),
+                              style: const TextStyle(
+                                color: Color(0xFF4F6EF7),
+                              ),
                             ),
                           ),
                         ],

@@ -130,7 +130,7 @@ class BudgetScreen extends ConsumerWidget {
                       ),
                       child: Text(
                         _t('Set Budget Pertama', 'Set Your First Budget'),
-                        style: TextStyle(color: Color(0xFF4F6EF7)),
+                        style: const TextStyle(color: Color(0xFF4F6EF7)),
                       ),
                     ),
                   ],
@@ -346,7 +346,7 @@ class BudgetScreen extends ConsumerWidget {
                   ),
                   title: Text(
                     _t('Hapus Budget', 'Delete Budget'),
-                    style: TextStyle(color: Colors.redAccent),
+                    style: const TextStyle(color: Colors.redAccent),
                   ),
                   onTap: () async {
                     Navigator.pop(ctx);

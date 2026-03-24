@@ -224,7 +224,7 @@ class _AddBudgetSheetState extends ConsumerState<AddBudgetSheet> {
                   ),
                   child: Text(
                     _t('Simpan Budget', 'Save Budget'),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,

@@ -143,8 +143,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null)
+      if (userId == null) {
         throw Exception(_t('User belum login', 'User is not logged in'));
+      }
 
       final tx = await Supabase.instance.client
           .from('transactions')
@@ -332,8 +333,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null)
+      if (userId == null) {
         throw Exception(_t('User belum login', 'User is not logged in'));
+      }
 
       await OfflineStore().clearUserData(userId);
       try {
@@ -580,7 +582,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Text(
                         _t('Akun Kamu', 'Your Account'),
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -708,7 +710,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: const Icon(Icons.logout_rounded, color: Color(0xFFFF5A6E)),
               label: Text(
                 _t('Keluar', 'Logout'),
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFFFF5A6E),
                   fontWeight: FontWeight.w700,
                 ),

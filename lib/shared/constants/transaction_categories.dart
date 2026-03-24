@@ -150,42 +150,52 @@ String normalizeCategoryKey(String input) {
       lettersOnly.contains('internet') && lettersOnly.contains('wifi')) {
     return 'internetwifi';
   }
-  if (lettersOnly.contains('token') && lettersOnly.contains('listrik'))
+  if (lettersOnly.contains('token') && lettersOnly.contains('listrik')) {
     return 'tokenlistrik';
-  if (lettersOnly.contains('air') && lettersOnly.contains('pdam'))
+  }
+  if (lettersOnly.contains('air') && lettersOnly.contains('pdam')) {
     return 'airpdam';
+  }
   if (lettersOnly.contains('bensin')) return 'bensin';
-  if (lettersOnly.contains('tol') || lettersOnly.contains('parkir'))
+  if (lettersOnly.contains('tol') || lettersOnly.contains('parkir')) {
     return 'tolparkir';
+  }
   if (lettersOnly.contains('transport')) return 'transportumum';
   if (lettersOnly.contains('cafe') || lettersOnly.contains('nongkrong')) {
     return 'caffenongkrong';
   }
   if (lettersOnly.contains('makan')) return 'makananharian';
-  if (lettersOnly.contains('pulsa') || lettersOnly.contains('data'))
+  if (lettersOnly.contains('pulsa') || lettersOnly.contains('data')) {
     return 'pulsadata';
+  }
   if (lettersOnly.contains('belanja')) return 'belanja';
   if (lettersOnly.contains('hiburan')) return 'hiburan';
   if (lettersOnly.contains('rumah')) return 'perawatanrumah';
-  if (lettersOnly.contains('gym') || lettersOnly.contains('olahraga'))
+  if (lettersOnly.contains('gym') || lettersOnly.contains('olahraga')) {
     return 'olahraga';
+  }
   if (lettersOnly.contains('asuransi')) return 'asuransi';
-  if (lettersOnly.contains('kesehatan') || lettersOnly.contains('obat'))
+  if (lettersOnly.contains('kesehatan') || lettersOnly.contains('obat')) {
     return 'kesehatan';
+  }
   if (lettersOnly.contains('pendidikan')) return 'pendidikan';
-  if (lettersOnly.contains('donasi') || lettersOnly.contains('zakat'))
+  if (lettersOnly.contains('donasi') || lettersOnly.contains('zakat')) {
     return 'donasi';
+  }
   if (lettersOnly.contains('langganan')) return 'langganan';
   if (lettersOnly.contains('fashion')) return 'fashion';
   if (lettersOnly.contains('perawatandiri')) return 'perawatandiri';
   if (lettersOnly.contains('tagihan')) return 'tagihan';
-  if (lettersOnly.contains('pajak') || lettersOnly.contains('administrasi'))
+  if (lettersOnly.contains('pajak') || lettersOnly.contains('administrasi')) {
     return 'tagihan';
-  if (lettersOnly.contains('sewa') || lettersOnly.contains('kos'))
+  }
+  if (lettersOnly.contains('sewa') || lettersOnly.contains('kos')) {
     return 'sewakos';
+  }
   if (lettersOnly.contains('laundry')) return 'laundry';
-  if (lettersOnly.contains('cicilan') || lettersOnly.contains('hutang'))
+  if (lettersOnly.contains('cicilan') || lettersOnly.contains('hutang')) {
     return 'cicilan';
+  }
   if (lettersOnly.contains('gaji')) return 'gaji';
   if (lettersOnly.contains('thr')) return 'thr';
   if (lettersOnly.contains('bonus')) return 'bonus';
@@ -195,10 +205,12 @@ String normalizeCategoryKey(String input) {
   if (lettersOnly.contains('komisi')) return 'komisi';
   if (lettersOnly.contains('penjualan')) return 'penjualan';
   if (lettersOnly.contains('usaha')) return 'usaha';
-  if (lettersOnly.contains('dividen') || lettersOnly.contains('investasi'))
+  if (lettersOnly.contains('dividen') || lettersOnly.contains('investasi')) {
     return 'investasi';
-  if (lettersOnly.contains('bunga') || lettersOnly.contains('tabungan'))
+  }
+  if (lettersOnly.contains('bunga') || lettersOnly.contains('tabungan')) {
     return 'bungatabungan';
+  }
   if (lettersOnly.contains('refund')) return 'refund';
   if (lettersOnly.contains('hadiah')) return 'hadiah';
 
