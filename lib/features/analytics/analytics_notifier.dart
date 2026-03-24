@@ -36,10 +36,12 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
   Future<void> changePeriod(String newPeriod) async {
     if (_currentPeriod == newPeriod) return;
     _currentPeriod = newPeriod;
-    
+
     // Set loading sementara mengambil data baru
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _fetchData(newPeriod, forceRefresh: true));
+    state = await AsyncValue.guard(
+      () => _fetchData(newPeriod, forceRefresh: true),
+    );
   }
 
   Future<void> refreshCurrentPeriod() async {
@@ -49,9 +51,15 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
     );
   }
 
-  Future<AnalyticsState> _fetchData(String period, {bool forceRefresh = false}) async {
+  Future<AnalyticsState> _fetchData(
+    String period, {
+    bool forceRefresh = false,
+  }) async {
     // CACHE LOGIC: Gunakan cache jika belum lewat 5 menit dan tidak di-force
-    if (!forceRefresh && _lastFetch != null && _cachedState != null && _cachedState!.period == period) {
+    if (!forceRefresh &&
+        _lastFetch != null &&
+        _cachedState != null &&
+        _cachedState!.period == period) {
       final difference = DateTime.now().difference(_lastFetch!);
       if (difference.inMinutes < 5) {
         return _cachedState!;
@@ -65,7 +73,10 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
     if (period == 'Yearly') start = DateTime(now.year - 1, now.month, now.day);
 
     // Fetch dari Supabase
-    final transactions = await _repository.fetchTransactionsByDateRange(start, now);
+    final transactions = await _repository.fetchTransactionsByDateRange(
+      start,
+      now,
+    );
 
     // Hitung Summary
     double income = 0;
@@ -93,6 +104,7 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
 }
 
 // Gunakan keepAlive agar cache 5 menit tetap berlaku meski user pindah tab
-final analyticsNotifierProvider = AsyncNotifierProvider<AnalyticsNotifier, AnalyticsState>(() {
-  return AnalyticsNotifier();
-});
+final analyticsNotifierProvider =
+    AsyncNotifierProvider<AnalyticsNotifier, AnalyticsState>(() {
+      return AnalyticsNotifier();
+    });

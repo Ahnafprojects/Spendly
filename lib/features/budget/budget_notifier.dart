@@ -49,5 +49,5 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
 
 final budgetNotifierProvider =
     AsyncNotifierProvider<BudgetNotifier, BudgetState>(() {
-  return BudgetNotifier();
-});
+      return BudgetNotifier();
+    });

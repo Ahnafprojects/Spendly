@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_shimmer.dart';
 import 'transaction_detail_screen.dart';
 import '../transaction_repository.dart';
@@ -22,6 +24,8 @@ class _TransactionHistoryScreenState
   final _searchController = TextEditingController();
   String _query = '';
   DateTime? _selectedDate;
+
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   @override
   void initState() {
@@ -51,7 +55,7 @@ class _TransactionHistoryScreenState
       initialDate: _selectedDate ?? now,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 5),
-      locale: const Locale('id', 'ID'),
+      locale: LanguageSettings.current.locale,
     );
     if (picked == null) return;
     setState(() {
@@ -61,6 +65,8 @@ class _TransactionHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF090B14) : const Color(0xFFF4F7FC);
     final card = isDark ? const Color(0xFF151A2A) : Colors.white;
@@ -71,7 +77,7 @@ class _TransactionHistoryScreenState
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        title: const Text('Riwayat Transaksi'),
+        title: Text(_t('Riwayat Transaksi', 'Transaction History')),
         backgroundColor: Colors.transparent,
       ),
       body: FutureBuilder<List<TransactionModel>>(
@@ -83,7 +89,7 @@ class _TransactionHistoryScreenState
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                'Gagal memuat riwayat:\n${snapshot.error}',
+                '${_t('Gagal memuat riwayat', 'Failed to load history')}:\n${snapshot.error}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: isDark ? Colors.redAccent : const Color(0xFFB3261E),
@@ -134,7 +140,7 @@ class _TransactionHistoryScreenState
           if (sorted.isEmpty) {
             return Center(
               child: Text(
-                'Belum ada transaksi',
+                _t('Belum ada transaksi', 'No transactions yet'),
                 style: TextStyle(
                   color: isDark ? Colors.white54 : const Color(0xFF5B6275),
                 ),
@@ -152,7 +158,10 @@ class _TransactionHistoryScreenState
                   onChanged: (value) => setState(() => _query = value),
                   style: TextStyle(color: title),
                   decoration: InputDecoration(
-                    hintText: 'Cari kategori / catatan / nominal',
+                    hintText: _t(
+                      'Cari kategori / catatan / nominal',
+                      'Search category / note / amount',
+                    ),
                     hintStyle: TextStyle(
                       color: isDark ? Colors.white38 : const Color(0xFF9AA4BD),
                     ),
@@ -201,10 +210,10 @@ class _TransactionHistoryScreenState
                       icon: const Icon(Icons.calendar_month_rounded, size: 18),
                       label: Text(
                         _selectedDate == null
-                            ? 'Filter tanggal'
+                            ? _t('Filter tanggal', 'Filter date')
                             : DateFormat(
                                 'dd MMM yyyy',
-                                'id_ID',
+                                LanguageSettings.current.locale.toString(),
                               ).format(_selectedDate!),
                       ),
                     ),
@@ -212,7 +221,7 @@ class _TransactionHistoryScreenState
                     if (_selectedDate != null)
                       TextButton(
                         onPressed: () => setState(() => _selectedDate = null),
-                        child: const Text('Reset tanggal'),
+                        child: Text(_t('Reset tanggal', 'Reset date')),
                       ),
                   ],
                 ),
@@ -222,7 +231,10 @@ class _TransactionHistoryScreenState
                     padding: const EdgeInsets.only(top: 18),
                     child: Center(
                       child: Text(
-                        'Tidak ada transaksi yang cocok',
+                        _t(
+                          'Tidak ada transaksi yang cocok',
+                          'No matching transactions found',
+                        ),
                         style: TextStyle(color: muted),
                       ),
                     ),
@@ -243,7 +255,7 @@ class _TransactionHistoryScreenState
                       : tx.date;
                   final date = DateFormat(
                     'dd MMM yyyy, HH:mm:ss',
-                    'id_ID',
+                    LanguageSettings.current.locale.toString(),
                   ).format(displayDate);
 
                   return Padding(
@@ -296,7 +308,7 @@ class _TransactionHistoryScreenState
                                   Text(
                                     tx.note?.isNotEmpty == true
                                         ? tx.note!
-                                        : tx.category,
+                                        : localizeCategory(tx.category),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -306,7 +318,7 @@ class _TransactionHistoryScreenState
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${tx.category} • $date',
+                                    '${localizeCategory(tx.category)} • $date',
                                     style: TextStyle(
                                       color: muted,
                                       fontSize: 12,

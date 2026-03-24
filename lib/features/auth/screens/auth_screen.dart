@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/services/app_text.dart';
+import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/spendly_brand.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../auth_notifier.dart';
@@ -20,8 +23,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String _registerCurrencyCode = CurrencySettings.current.code;
+  String _registerLanguageCode = LanguageSettings.current.code;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   @override
   void dispose() {
@@ -32,17 +39,86 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   // Fungsi untuk submit form
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      if (_isLogin) {
-        ref.read(authNotifierProvider.notifier).signIn(email, password);
-      } else {
-        ref.read(authNotifierProvider.notifier).signUp(email, password);
-      }
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (_isLogin) {
+      await ref.read(authNotifierProvider.notifier).signIn(email, password);
+      return;
     }
+
+    await CurrencySettings.setCurrencyCode(_registerCurrencyCode);
+    await ref
+        .read(appLanguageProvider.notifier)
+        .setLanguage(_registerLanguageCode);
+    await ref.read(authNotifierProvider.notifier).signUp(email, password);
+  }
+
+  Future<void> _pickRegisterCurrency() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: CurrencySettings.options.map((option) {
+              final active = option.code == _registerCurrencyCode;
+              return ListTile(
+                title: Text('${option.code} (${option.symbol.trim()})'),
+                subtitle: Text(option.label),
+                trailing: active
+                    ? const Icon(Icons.check_circle, color: Color(0xFF2E90FA))
+                    : null,
+                onTap: () => Navigator.pop(context, option.code),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) return;
+    setState(() => _registerCurrencyCode = selected);
+  }
+
+  Future<void> _pickRegisterLanguage() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: LanguageSettings.options.map((option) {
+              final active = option.code == _registerLanguageCode;
+              final cc = option.locale.countryCode;
+              final localeText = cc == null
+                  ? option.locale.languageCode
+                  : '${option.locale.languageCode}_$cc';
+              return ListTile(
+                title: Text(option.label),
+                subtitle: Text(localeText),
+                trailing: active
+                    ? const Icon(Icons.check_circle, color: Color(0xFF2E90FA))
+                    : null,
+                onTap: () => Navigator.pop(context, option.code),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) return;
+    setState(() => _registerLanguageCode = selected);
   }
 
   @override
@@ -65,7 +141,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           if (!_isLogin) {
             AppNotice.success(
               context,
-              'Registrasi berhasil. Cek email untuk verifikasi, lalu login.',
+              _t(
+                'Registrasi berhasil. Cek email untuk verifikasi, lalu login.',
+                'Registration successful. Check your email for verification, then log in.',
+              ),
             );
             setState(() => _isLogin = true);
             return;
@@ -73,12 +152,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
           AppNotice.warning(
             context,
-            'Login belum aktif. Pastikan email sudah diverifikasi.',
+            _t(
+              'Login belum aktif. Pastikan email sudah diverifikasi.',
+              'Login is not active yet. Make sure your email is verified.',
+            ),
           );
         },
         error: (error, stackTrace) {
           // Menampilkan pesan error dari Supabase
-          String message = "Terjadi kesalahan";
+          String message = _t('Terjadi kesalahan', 'Something went wrong');
           if (error is AuthException) {
             message = error.message;
           }
@@ -111,7 +193,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const SpendlyBrandMark(size: 78),
               const SizedBox(height: 14),
               Text(
-                _isLogin ? 'Welcome Back' : 'Create Your Account',
+                _isLogin
+                    ? _t('Selamat Datang Kembali', 'Welcome Back')
+                    : _t('Buat Akun Anda', 'Create Your Account'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: title,
                   fontWeight: FontWeight.w800,
@@ -120,8 +204,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const SizedBox(height: 6),
               Text(
                 _isLogin
-                    ? 'Kelola keuangan kamu dengan cepat.'
-                    : 'Mulai perjalanan finansial yang lebih rapi.',
+                    ? _t(
+                        'Kelola keuangan kamu dengan cepat.',
+                        'Manage your finances faster.',
+                      )
+                    : _t(
+                        'Mulai perjalanan finansial yang lebih rapi.',
+                        'Start your cleaner financial journey.',
+                      ),
                 style: TextStyle(color: muted, fontSize: 13),
               ),
               const SizedBox(height: 28),
@@ -164,14 +254,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           children: [
                             Expanded(
                               child: _buildTabButton(
-                                'Login',
+                                _t('Masuk', 'Login'),
                                 true,
                                 isDark: isDark,
                               ),
                             ),
                             Expanded(
                               child: _buildTabButton(
-                                'Register',
+                                _t('Daftar', 'Register'),
                                 false,
                                 isDark: isDark,
                               ),
@@ -192,10 +282,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Email wajib diisi';
+                            return _t('Email wajib diisi', 'Email is required');
                           }
                           if (!value.contains('@')) {
-                            return 'Format email tidak valid';
+                            return _t(
+                              'Format email tidak valid',
+                              'Invalid email format',
+                            );
                           }
                           return null;
                         },
@@ -205,7 +298,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       // Field Password
                       _buildTextField(
                         controller: _passwordController,
-                        hintText: 'Password',
+                        hintText: _t('Kata Sandi', 'Password'),
                         icon: Icons.lock_outline,
                         obscureText: _obscurePassword,
                         onToggleObscure: () {
@@ -216,10 +309,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         inputBorder: inputBorder,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Password wajib diisi';
+                            return _t(
+                              'Password wajib diisi',
+                              'Password is required',
+                            );
                           }
                           if (value.length < 8) {
-                            return 'Password minimal 8 karakter';
+                            return _t(
+                              'Password minimal 8 karakter',
+                              'Password must be at least 8 characters',
+                            );
                           }
                           return null;
                         },
@@ -230,7 +329,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         const SizedBox(height: 16),
                         _buildTextField(
                           controller: _confirmPasswordController,
-                          hintText: 'Konfirmasi Password',
+                          hintText: _t(
+                            'Konfirmasi Kata Sandi',
+                            'Confirm Password',
+                          ),
                           icon: Icons.lock_reset_outlined,
                           obscureText: _obscureConfirmPassword,
                           onToggleObscure: () {
@@ -244,10 +346,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           inputBorder: inputBorder,
                           validator: (value) {
                             if (value != _passwordController.text) {
-                              return 'Password tidak cocok';
+                              return _t(
+                                'Password tidak cocok',
+                                'Password does not match',
+                              );
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSelectTile(
+                          icon: Icons.language_rounded,
+                          label: _t('Bahasa', 'Language'),
+                          value:
+                              LanguageSettings.byCode(
+                                _registerLanguageCode,
+                              )?.label ??
+                              _registerLanguageCode.toUpperCase(),
+                          isDark: isDark,
+                          inputBg: inputBg,
+                          inputBorder: inputBorder,
+                          onTap: _pickRegisterLanguage,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSelectTile(
+                          icon: Icons.attach_money_rounded,
+                          label: _t('Mata Uang', 'Currency'),
+                          value: _registerCurrencyCode,
+                          isDark: isDark,
+                          inputBg: inputBg,
+                          inputBorder: inputBorder,
+                          onTap: _pickRegisterCurrency,
                         ),
                       ],
                       const SizedBox(height: 32),
@@ -283,7 +412,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                   ),
                                 )
                               : Text(
-                                  _isLogin ? 'Masuk' : 'Daftar',
+                                  _isLogin
+                                      ? _t('Masuk', 'Sign In')
+                                      : _t('Daftar', 'Sign Up'),
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
@@ -311,7 +442,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }) {
     final isSelected = _isLogin == isLoginTab;
     return GestureDetector(
-      onTap: () => setState(() => _isLogin = isLoginTab),
+      onTap: () => setState(() {
+        _isLogin = isLoginTab;
+        if (!_isLogin) {
+          _registerCurrencyCode = CurrencySettings.current.code;
+          _registerLanguageCode = LanguageSettings.current.code;
+        }
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -387,6 +524,64 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           borderSide: const BorderSide(color: Color(0xFF2E90FA)),
         ),
         errorStyle: const TextStyle(color: Colors.redAccent),
+      ),
+    );
+  }
+
+  Widget _buildSelectTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+    required Color inputBg,
+    required Color inputBorder,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: inputBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: inputBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isDark ? Colors.white54 : const Color(0xFF72809E),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isDark ? Colors.white54 : const Color(0xFF72809E),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.expand_more_rounded,
+              color: isDark ? Colors.white54 : const Color(0xFF72809E),
+            ),
+          ],
+        ),
       ),
     );
   }

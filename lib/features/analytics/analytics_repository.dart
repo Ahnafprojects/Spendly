@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../shared/models/transaction_model.dart';
+import '../../shared/services/language_settings.dart';
 import '../../shared/services/offline_store.dart';
 
 // Model bantuan untuk Chart
@@ -86,6 +87,7 @@ class AnalyticsRepository {
     String period,
   ) {
     final now = DateTime.now();
+    final locale = LanguageSettings.current.locale.toString();
 
     if (period == 'Weekly') {
       final start = DateTime(
@@ -109,7 +111,7 @@ class AnalyticsRepository {
             .where((tx) => tx.type == 'expense')
             .fold<double>(0, (sum, tx) => sum + tx.amount);
 
-        return BarMetric(DateFormat('E', 'id_ID').format(day), income, expense);
+        return BarMetric(DateFormat('E', locale).format(day), income, expense);
       });
     }
 
@@ -147,7 +149,7 @@ class AnalyticsRepository {
           .fold<double>(0, (sum, tx) => sum + tx.amount);
 
       return BarMetric(
-        DateFormat('MMM', 'id_ID').format(DateTime(now.year, month, 1)),
+        DateFormat('MMM', locale).format(DateTime(now.year, month, 1)),
         income,
         expense,
       );

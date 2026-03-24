@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import '../../../shared/constants/transaction_categories.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../analytics_notifier.dart';
 import '../analytics_repository.dart';
 
@@ -18,9 +21,19 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   int _touchedPieIndex = -1;
+  String _t(String id, String en) => AppText.t(id: id, en: en);
+
+  String _periodLabel(String key) {
+    if (key == 'Weekly') return _t('Mingguan', 'Weekly');
+    if (key == 'Monthly') return _t('Bulanan', 'Monthly');
+    if (key == 'Yearly') return _t('Tahunan', 'Yearly');
+    return key;
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final analyticsState = ref.watch(analyticsNotifierProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -33,7 +46,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         elevation: 0,
         centerTitle: false,
         title: Text(
-          'Analytics',
+          _t('Analitik', 'Analytics'),
           style: TextStyle(
             color: isDark ? Colors.white : const Color(0xFF1A1E2A),
             fontWeight: FontWeight.w700,
@@ -48,7 +61,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Text(
-                'Gagal memuat analytics:\n$err',
+                '${_t('Gagal memuat analitik', 'Failed to load analytics')}:\n$err',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.redAccent),
               ),
@@ -78,18 +91,18 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           const SizedBox(height: 18),
           _buildMetricsRow(data),
           const SizedBox(height: 22),
-          _buildSectionTitle('Cashflow Trend'),
+          _buildSectionTitle(_t('Tren Arus Kas', 'Cashflow Trend')),
           const SizedBox(height: 12),
           _buildBarChartCard(data.barMetrics),
           const SizedBox(height: 22),
-          _buildSectionTitle('Spending Breakdown'),
+          _buildSectionTitle(_t('Rincian Pengeluaran', 'Spending Breakdown')),
           const SizedBox(height: 12),
           if (hasAnyData && data.categoryMetrics.isNotEmpty)
             _buildPieChartCard(data.categoryMetrics)
           else
             _buildEmptyState(),
           const SizedBox(height: 22),
-          _buildSectionTitle('Top Spending'),
+          _buildSectionTitle(_t('Pengeluaran Terbesar', 'Top Spending')),
           const SizedBox(height: 12),
           _buildTopSpendingCard(data.categoryMetrics, data.totalExpense),
         ],
@@ -140,7 +153,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  period,
+                  _periodLabel(period),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: selected
@@ -174,7 +187,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Net Saving',
+            _t('Tabungan Bersih', 'Net Saving'),
             style: TextStyle(
               color: isDark ? Colors.white60 : const Color(0xFF5B6275),
               fontSize: 13,
@@ -202,8 +215,14 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               const SizedBox(width: 6),
               Text(
                 isPositive
-                    ? 'Keuangan kamu masih sehat.'
-                    : 'Pengeluaran lebih besar dari pemasukan.',
+                    ? _t(
+                        'Keuangan kamu masih sehat.',
+                        'Your finances are in good shape.',
+                      )
+                    : _t(
+                        'Pengeluaran lebih besar dari pemasukan.',
+                        'Expenses are greater than income.',
+                      ),
                 style: TextStyle(
                   color: isDark ? Colors.white70 : const Color(0xFF5B6275),
                   fontSize: 12.5,
@@ -221,7 +240,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       children: [
         Expanded(
           child: _buildMetricCard(
-            title: 'Income',
+            title: _t('Pemasukan', 'Income'),
             value: data.totalIncome,
             accent: const Color(0xFF00D4AA),
             icon: Icons.south_west_rounded,
@@ -230,7 +249,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildMetricCard(
-            title: 'Expense',
+            title: _t('Pengeluaran', 'Expense'),
             value: data.totalExpense,
             accent: const Color(0xFFFF5A6E),
             icon: Icons.north_east_rounded,
@@ -274,7 +293,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            CurrencySettings.compactFormatter().format(value),
+            CurrencySettings.formatCompact(value),
             style: TextStyle(
               color: isDark ? Colors.white : const Color(0xFF1A1E2A),
               fontSize: 16,
@@ -318,7 +337,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final isIncome = rodIndex == 0;
                 return BarTooltipItem(
-                  '${isIncome ? 'Income' : 'Expense'}\n${CurrencySettings.format(rod.toY)}',
+                  '${isIncome ? _t('Pemasukan', 'Income') : _t('Pengeluaran', 'Expense')}\n${CurrencySettings.format(rod.toY)}',
                   TextStyle(
                     color: isIncome
                         ? const Color(0xFF00D4AA)
@@ -480,7 +499,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Top Category',
+                      _t('Kategori Teratas', 'Top Category'),
                       style: TextStyle(
                         color: isDark
                             ? Colors.white54
@@ -490,7 +509,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      top.category,
+                      localizeCategory(top.category),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: isDark ? Colors.white : const Color(0xFF1A1E2A),
@@ -542,7 +561,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${e.value.category} ${percent.toStringAsFixed(0)}%',
+                      '${localizeCategory(e.value.category)} ${percent.toStringAsFixed(0)}%',
                       style: TextStyle(
                         color: isDark
                             ? Colors.white70
@@ -566,7 +585,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (categories.isEmpty || totalExpense <= 0) {
-      return _buildEmptyState(text: 'Belum ada spending untuk ditampilkan.');
+      return _buildEmptyState(
+        text: _t(
+          'Belum ada pengeluaran untuk ditampilkan.',
+          'No spending data to display yet.',
+        ),
+      );
     }
 
     final top = categories.take(5).toList();
@@ -590,7 +614,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        item.category,
+                        localizeCategory(item.category),
                         style: TextStyle(
                           color: isDark
                               ? Colors.white
@@ -632,8 +656,10 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     );
   }
 
-  Widget _buildEmptyState({String text = 'Belum ada data analytics.'}) {
+  Widget _buildEmptyState({String? text}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayText =
+        text ?? _t('Belum ada data analitik.', 'No analytics data yet.');
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
@@ -653,7 +679,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            text,
+            displayText,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isDark ? Colors.white60 : const Color(0xFF5B6275),

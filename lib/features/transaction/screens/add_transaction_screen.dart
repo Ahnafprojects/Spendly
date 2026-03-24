@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/constants/transaction_categories.dart';
 import '../../../shared/models/transaction_model.dart';
+import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
+import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../transaction_repository.dart';
 import '../transaction_notifier.dart';
@@ -22,12 +24,13 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
-  final _amountFormat = CurrencySettings.decimalFormatter();
 
   String _type = 'expense';
   String _category = TransactionCategories.expense.first;
   bool _isSubmitting = false;
   bool _showAllCategories = false;
+
+  String _t(String id, String en) => AppText.t(id: id, en: en);
 
   List<String> get _activeCategories => _type == 'income'
       ? TransactionCategories.income
@@ -40,7 +43,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     if (tx != null) {
       _type = tx.type;
       _category = tx.category;
-      _amountController.text = _amountFormat.format(tx.amount.toInt());
+      _amountController.text = CurrencySettings.formatInputFromIdr(tx.amount);
       _noteController.text = tx.note ?? '';
     }
   }
@@ -53,8 +56,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   }
 
   double _parseAmount() {
-    final digits = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    return digits.isEmpty ? 0 : double.parse(digits);
+    return CurrencySettings.parseInputToIdr(_amountController.text);
   }
 
   Future<void> _submit() async {
@@ -114,13 +116,22 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       AppNotice.success(
         context,
         initial == null
-            ? 'Transaksi berhasil ditambahkan'
-            : 'Transaksi berhasil diperbarui',
+            ? _t(
+                'Transaksi berhasil ditambahkan',
+                'Transaction added successfully',
+              )
+            : _t(
+                'Transaksi berhasil diperbarui',
+                'Transaction updated successfully',
+              ),
       );
       context.pop(true);
     } catch (e) {
       if (!mounted) return;
-      AppNotice.error(context, 'Gagal menambah transaksi: $e');
+      AppNotice.error(
+        context,
+        '${_t('Gagal menyimpan transaksi', 'Failed to save transaction')}: $e',
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -131,6 +142,8 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     final accent = _type == 'income'
         ? const Color(0xFF00D4AA)
         : const Color(0xFF4F6EF7);
+    ref.watch(appLanguageProvider);
+    ref.watch(appCurrencyProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF090B14) : const Color(0xFFF4F7FC);
     final muted = isDark ? Colors.white70 : const Color(0xFF5B6275);
@@ -143,8 +156,8 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       appBar: AppBar(
         title: Text(
           widget.initialTransaction == null
-              ? 'Add Transaction'
-              : 'Edit Transaction',
+              ? _t('Tambah Transaksi', 'Add Transaction')
+              : _t('Edit Transaksi', 'Edit Transaction'),
         ),
         backgroundColor: bg,
         elevation: 0,
@@ -165,19 +178,29 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                   ),
                   child: Row(
                     children: [
-                      Expanded(child: _buildTypePill('expense', 'Expense')),
+                      Expanded(
+                        child: _buildTypePill(
+                          'expense',
+                          _t('Pengeluaran', 'Expense'),
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildTypePill('income', 'Income')),
+                      Expanded(
+                        child: _buildTypePill(
+                          'income',
+                          _t('Pemasukan', 'Income'),
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
-                _buildLabel('Amount'),
+                _buildLabel(_t('Nominal', 'Amount')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [_IdrThousandsFormatter()],
+                  inputFormatters: [_CurrencyThousandsFormatter()],
                   onChanged: (_) => setState(() {}),
                   style: TextStyle(
                     color: title,
@@ -196,14 +219,21 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                       RegExp(r'[^0-9]'),
                       '',
                     );
-                    if (digits.isEmpty) return 'Amount wajib diisi';
+                    if (digits.isEmpty) {
+                      return _t('Nominal wajib diisi', 'Amount is required');
+                    }
                     final amount = double.tryParse(digits) ?? 0;
-                    if (amount <= 0) return 'Amount harus lebih dari 0';
+                    if (amount <= 0) {
+                      return _t(
+                        'Nominal harus lebih dari 0',
+                        'Amount must be greater than 0',
+                      );
+                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 18),
-                _buildLabel('Category'),
+                _buildLabel(_t('Kategori', 'Category')),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -215,7 +245,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                           .map((category) {
                             final selected = category == _category;
                             return ChoiceChip(
-                              label: Text(category),
+                              label: Text(localizeCategory(category)),
                               selected: selected,
                               onSelected: (_) =>
                                   setState(() => _category = category),
@@ -251,21 +281,30 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                     ),
                     child: Text(
                       _showAllCategories
-                          ? 'Sembunyikan sebagian kategori'
-                          : 'Tampilkan kategori selengkapnya',
+                          ? _t(
+                              'Sembunyikan sebagian kategori',
+                              'Hide some categories',
+                            )
+                          : _t(
+                              'Tampilkan kategori selengkapnya',
+                              'Show all categories',
+                            ),
                       style: const TextStyle(color: Color(0xFF4F6EF7)),
                     ),
                   ),
                 ],
                 const SizedBox(height: 18),
-                _buildLabel('Note (opsional)'),
+                _buildLabel(_t('Catatan (opsional)', 'Note (optional)')),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _noteController,
                   maxLines: 3,
                   style: TextStyle(color: title),
                   decoration: _fieldDecoration(
-                    'Contoh: Makan siang di kantor',
+                    _t(
+                      'Contoh: Makan siang di kantor',
+                      'Example: Lunch at office',
+                    ),
                     isDark: isDark,
                   ),
                 ),
@@ -294,9 +333,9 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Simpan',
-                              style: TextStyle(
+                          : Text(
+                              _t('Simpan', 'Save'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -408,9 +447,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
   }
 }
 
-class _IdrThousandsFormatter extends TextInputFormatter {
-  final _format = CurrencySettings.decimalFormatter();
-
+class _CurrencyThousandsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
@@ -422,7 +459,7 @@ class _IdrThousandsFormatter extends TextInputFormatter {
     }
 
     final number = int.parse(digitsOnly);
-    final newText = _format.format(number);
+    final newText = CurrencySettings.decimalFormatter().format(number);
     return TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: newText.length),
