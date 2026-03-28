@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../account/account_notifier.dart';
 import 'analytics_repository.dart';
 
 // State yang menampung semua data Analytics
@@ -26,10 +27,12 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
   DateTime? _lastFetch;
   String _currentPeriod = 'Weekly'; // Default
   AnalyticsState? _cachedState;
+  String? _cachedAccountId;
 
   @override
   FutureOr<AnalyticsState> build() async {
     _repository = ref.watch(analyticsRepositoryProvider);
+    ref.watch(activeAccountIdProvider);
     return _fetchData(_currentPeriod);
   }
 
@@ -59,7 +62,8 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
     if (!forceRefresh &&
         _lastFetch != null &&
         _cachedState != null &&
-        _cachedState!.period == period) {
+        _cachedState!.period == period &&
+        _cachedAccountId == ref.read(activeAccountIdProvider)) {
       final difference = DateTime.now().difference(_lastFetch!);
       if (difference.inMinutes < 5) {
         return _cachedState!;
@@ -73,17 +77,25 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
     if (period == 'Yearly') start = DateTime(now.year - 1, now.month, now.day);
 
     // Fetch dari Supabase
+    final accountId = ref.read(activeAccountIdProvider);
     final transactions = await _repository.fetchTransactionsByDateRange(
       start,
       now,
+      accountId: accountId,
     );
 
     // Hitung Summary
     double income = 0;
     double expense = 0;
     for (var tx in transactions) {
-      if (tx.type == 'income') income += tx.amount;
-      if (tx.type == 'expense') expense += tx.amount;
+      final isIncome =
+          tx.type == 'income' ||
+          (tx.type == 'transfer' && tx.transferDirection == 'in');
+      final isExpense =
+          tx.type == 'expense' ||
+          (tx.type == 'transfer' && tx.transferDirection == 'out');
+      if (isIncome) income += tx.amount;
+      if (isExpense) expense += tx.amount;
     }
 
     // Susun State
@@ -99,6 +111,7 @@ class AnalyticsNotifier extends AsyncNotifier<AnalyticsState> {
 
     _lastFetch = DateTime.now();
     _cachedState = newState;
+    _cachedAccountId = accountId;
     return newState;
   }
 }

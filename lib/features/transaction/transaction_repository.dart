@@ -73,61 +73,73 @@ class TransactionRepository {
   }
 
   // Mengambil 10 transaksi terakhir user
-  Future<List<TransactionModel>> fetchRecent([int limit = 10]) async {
+  Future<List<TransactionModel>> fetchRecent({
+    int limit = 10,
+    String? accountId,
+  }) async {
     final userId = await _resolveUserId();
 
     try {
       if (_canHitRemote) {
         await _syncPendingOps(userId);
       }
-      final response = await _supabase
-          .from('transactions')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false)
-          .limit(limit);
+      var query = _supabase.from('transactions').select().eq('user_id', userId);
+      if (accountId != null) {
+        query = query.eq('account_id', accountId);
+      }
+      final response = await query.order('date', ascending: false).limit(limit);
       final rows = (response as List).cast<Map<String, dynamic>>();
       await _offlineStore.writeTransactions(userId, rows);
       return rows.map(TransactionModel.fromJson).toList();
     } catch (_) {
       final local = await _offlineStore.readTransactions(userId);
-      local.sort((a, b) {
+      final localFiltered = accountId == null
+          ? local
+          : local
+                .where((tx) => (tx['account_id'] ?? '').toString() == accountId)
+                .toList();
+      localFiltered.sort((a, b) {
         final ad =
             DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime(1970);
         final bd =
             DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime(1970);
         return bd.compareTo(ad);
       });
-      return local.take(limit).map(TransactionModel.fromJson).toList();
+      return localFiltered.take(limit).map(TransactionModel.fromJson).toList();
     }
   }
 
   // Mengambil SEMUA transaksi user
-  Future<List<TransactionModel>> fetchAll() async {
+  Future<List<TransactionModel>> fetchAll({String? accountId}) async {
     final userId = await _resolveUserId();
 
     try {
       if (_canHitRemote) {
         await _syncPendingOps(userId);
       }
-      final response = await _supabase
-          .from('transactions')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
+      var query = _supabase.from('transactions').select().eq('user_id', userId);
+      if (accountId != null) {
+        query = query.eq('account_id', accountId);
+      }
+      final response = await query.order('date', ascending: false);
       final rows = (response as List).cast<Map<String, dynamic>>();
       await _offlineStore.writeTransactions(userId, rows);
       return rows.map(TransactionModel.fromJson).toList();
     } catch (_) {
       final local = await _offlineStore.readTransactions(userId);
-      local.sort((a, b) {
+      final localFiltered = accountId == null
+          ? local
+          : local
+                .where((tx) => (tx['account_id'] ?? '').toString() == accountId)
+                .toList();
+      localFiltered.sort((a, b) {
         final ad =
             DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime(1970);
         final bd =
             DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime(1970);
         return bd.compareTo(ad);
       });
-      return local.map(TransactionModel.fromJson).toList();
+      return localFiltered.map(TransactionModel.fromJson).toList();
     }
   }
 

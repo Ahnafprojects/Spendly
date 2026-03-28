@@ -2,9 +2,12 @@ class TransactionModel {
   final String id;
   final String userId;
   final double amount;
-  final String type; // 'income' atau 'expense'
+  final String type; // 'income', 'expense', atau 'transfer'
   final String category;
   final String? note;
+  final String? accountId;
+  final String? transferDirection; // in / out (khusus transfer)
+  final String? transferGroupId;
   final DateTime date;
   final DateTime createdAt;
 
@@ -15,6 +18,9 @@ class TransactionModel {
     required this.type,
     required this.category,
     this.note,
+    this.accountId,
+    this.transferDirection,
+    this.transferGroupId,
     required this.date,
     required this.createdAt,
   });
@@ -28,6 +34,9 @@ class TransactionModel {
       type: json['type'],
       category: json['category'],
       note: json['note'],
+      accountId: json['account_id']?.toString(),
+      transferDirection: json['transfer_direction']?.toString(),
+      transferGroupId: json['transfer_group_id']?.toString(),
       date: DateTime.parse(json['date']),
       createdAt: DateTime.parse(json['created_at']),
     );
@@ -42,6 +51,9 @@ class TransactionModel {
       'type': type,
       'category': category,
       'note': note,
+      'account_id': accountId,
+      'transfer_direction': transferDirection,
+      'transfer_group_id': transferGroupId,
       'date': date.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
     };

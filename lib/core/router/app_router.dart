@@ -4,10 +4,8 @@ import '../../features/analytics/screens/analytics_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
-import '../../features/dashboard/screens/dashboard_screen.dart';
-import '../../features/settings/screens/settings_screen.dart';
+import '../../features/navigation/screens/main_tab_screen.dart';
 import '../../features/transaction/screens/add_transaction_screen.dart';
-import '../../features/transaction/screens/transaction_history_screen.dart';
 import '../../features/transfer/screens/transfer_screen.dart';
 import '../../shared/models/transaction_model.dart';
 
@@ -34,7 +32,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        builder: (context, state) => const DashboardScreen(),
+        builder: (context, state) => const MainTabScreen(currentIndex: 0),
       ),
       GoRoute(
         path: '/add-transaction',
@@ -48,7 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/transactions',
         name: 'transactions',
-        builder: (context, state) => const TransactionHistoryScreen(),
+        builder: (context, state) => const MainTabScreen(currentIndex: 1),
       ),
       GoRoute(
         path: '/transfer',
@@ -61,6 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AnalyticsScreen(),
       ),
       GoRoute(
+        path: '/accounts',
+        name: 'accounts',
+        builder: (context, state) => const MainTabScreen(currentIndex: 2),
+      ),
+      GoRoute(
         path: '/budget',
         name: 'budget',
         builder: (context, state) => const BudgetScreen(),
@@ -68,7 +71,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         name: 'settings',
-        builder: (context, state) => const SettingsScreen(),
+        builder: (context, state) => const MainTabScreen(currentIndex: 3),
       ),
     ],
   );

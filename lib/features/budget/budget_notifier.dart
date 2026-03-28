@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../account/account_notifier.dart';
 import 'budget_repository.dart';
 import 'models/budget_usage_model.dart';
 
@@ -17,11 +18,15 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
   @override
   FutureOr<BudgetState> build() async {
     _repository = ref.watch(budgetRepositoryProvider);
+    ref.watch(activeAccountIdProvider);
     return _fetchData(_currentMonth);
   }
 
   Future<BudgetState> _fetchData(DateTime month) async {
-    final usages = await _repository.fetchBudgetUsage(month);
+    final usages = await _repository.fetchBudgetUsage(
+      month,
+      accountId: ref.read(activeAccountIdProvider),
+    );
     return BudgetState(selectedMonth: month, usages: usages);
   }
 

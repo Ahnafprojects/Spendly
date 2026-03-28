@@ -29,6 +29,16 @@ class AnalyticsRepository {
   }) : _supabase = supabase ?? Supabase.instance.client,
        _offlineStore = offlineStore;
 
+  bool _isIncome(TransactionModel tx) {
+    return tx.type == 'income' ||
+        (tx.type == 'transfer' && tx.transferDirection == 'in');
+  }
+
+  bool _isExpense(TransactionModel tx) {
+    return tx.type == 'expense' ||
+        (tx.type == 'transfer' && tx.transferDirection == 'out');
+  }
+
   Future<String> _resolveUserId() async {
     final authId = _supabase.auth.currentUser?.id;
     if (authId != null && authId.isNotEmpty) {
@@ -43,24 +53,34 @@ class AnalyticsRepository {
   // Mengambil data berdasarkan rentang tanggal
   Future<List<TransactionModel>> fetchTransactionsByDateRange(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? accountId,
+  }) async {
     final userId = await _resolveUserId();
 
     try {
-      final response = await _supabase
+      var query = _supabase
           .from('transactions')
           .select()
           .eq('user_id', userId)
           .gte('date', start.toIso8601String())
           .lte('date', end.toIso8601String());
+      if (accountId != null) {
+        query = query.eq('account_id', accountId);
+      }
+      final response = await query;
       final rows = (response as List).cast<Map<String, dynamic>>();
       return rows.map((e) => TransactionModel.fromJson(e)).toList();
     } catch (_) {
       final local = await _offlineStore.readTransactions(userId);
       return local
           .map((e) => TransactionModel.fromJson(e))
-          .where((tx) => !tx.date.isBefore(start) && !tx.date.isAfter(end))
+          .where(
+            (tx) =>
+                !tx.date.isBefore(start) &&
+                !tx.date.isAfter(end) &&
+                (accountId == null || tx.accountId == accountId),
+          )
           .toList();
     }
   }
@@ -70,7 +90,7 @@ class AnalyticsRepository {
     List<TransactionModel> transactions,
   ) {
     final Map<String, double> grouped = {};
-    for (var tx in transactions.where((t) => t.type == 'expense')) {
+    for (var tx in transactions.where(_isExpense)) {
       grouped[tx.category] = (grouped[tx.category] ?? 0) + tx.amount;
     }
 
@@ -105,10 +125,10 @@ class AnalyticsRepository {
         );
 
         final income = dayTx
-            .where((tx) => tx.type == 'income')
+            .where(_isIncome)
             .fold<double>(0, (sum, tx) => sum + tx.amount);
         final expense = dayTx
-            .where((tx) => tx.type == 'expense')
+            .where(_isExpense)
             .fold<double>(0, (sum, tx) => sum + tx.amount);
 
         return BarMetric(DateFormat('E', locale).format(day), income, expense);
@@ -126,10 +146,10 @@ class AnalyticsRepository {
         );
 
         final income = weekTx
-            .where((tx) => tx.type == 'income')
+            .where(_isIncome)
             .fold<double>(0, (sum, tx) => sum + tx.amount);
         final expense = weekTx
-            .where((tx) => tx.type == 'expense')
+            .where(_isExpense)
             .fold<double>(0, (sum, tx) => sum + tx.amount);
 
         return BarMetric('W$weekIndex', income, expense);
@@ -142,10 +162,10 @@ class AnalyticsRepository {
         (tx) => tx.date.year == now.year && tx.date.month == month,
       );
       final income = monthTx
-          .where((tx) => tx.type == 'income')
+          .where(_isIncome)
           .fold<double>(0, (sum, tx) => sum + tx.amount);
       final expense = monthTx
-          .where((tx) => tx.type == 'expense')
+          .where(_isExpense)
           .fold<double>(0, (sum, tx) => sum + tx.amount);
 
       return BarMetric(

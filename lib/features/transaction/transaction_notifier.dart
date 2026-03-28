@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/models/transaction_model.dart';
 import '../../shared/services/budget_checker.dart';
+import '../account/account_notifier.dart';
 import '../budget/budget_notifier.dart';
 import 'transaction_repository.dart';
 
@@ -11,12 +12,16 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
   @override
   FutureOr<List<TransactionModel>> build() async {
     _repository = ref.watch(transactionRepositoryProvider);
+    ref.watch(activeAccountIdProvider);
     return _fetchRecentTransactions();
   }
 
   Future<List<TransactionModel>> _fetchRecentTransactions() async {
     // Mengambil 10 transaksi terbaru
-    return await _repository.fetchRecent(10);
+    return _repository.fetchRecent(
+      limit: 10,
+      accountId: ref.read(activeAccountIdProvider),
+    );
   }
 
   // Fungsi untuk Pull-to-refresh

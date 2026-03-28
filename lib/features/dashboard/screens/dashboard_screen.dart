@@ -10,11 +10,16 @@ import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../../../shared/services/language_settings.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../account/account_model.dart';
+import '../../account/account_notifier.dart';
+import '../../account/widgets/transfer_sheet.dart';
 import '../../transaction/transaction_notifier.dart';
 import '../../transaction/screens/transaction_detail_screen.dart';
 import '../../../shared/models/transaction_model.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_shimmer.dart';
+
+final dashboardBalanceHiddenProvider = StateProvider<bool>((ref) => false);
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -25,6 +30,16 @@ class DashboardScreen extends ConsumerWidget {
     ref.watch(appCurrencyProvider);
     String t(String id, String en) => AppText.t(id: id, en: en);
     final transactionState = ref.watch(transactionNotifierProvider);
+    final accountState = ref.watch(accountNotifierProvider);
+    final activeAccountId = ref.watch(activeAccountIdProvider);
+    final activeAccount = ref.watch(activeAccountProvider);
+    final balances =
+        ref.watch(accountBalancesProvider).valueOrNull ??
+        const <String, double>{};
+    final isBalanceHidden = ref.watch(dashboardBalanceHiddenProvider);
+    final currentBalance = activeAccount == null
+        ? 0.0
+        : (balances[activeAccount.id] ?? activeAccount.initialBalance);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF4F7FC);
     final card = isDark ? const Color(0xFF141420) : Colors.white;
@@ -77,8 +92,20 @@ class DashboardScreen extends ConsumerWidget {
 
                       // Hero Element: Balance Card
                       transactionState.when(
-                        data: (transactions) =>
-                            _buildBalanceCard(transactions, isDark: isDark),
+                        data: (transactions) => _buildBalanceCard(
+                          transactions,
+                          isDark: isDark,
+                          balanceValue: currentBalance,
+                          hideAmount: isBalanceHidden,
+                          onToggleHide: () {
+                            ref
+                                    .read(
+                                      dashboardBalanceHiddenProvider.notifier,
+                                    )
+                                    .state =
+                                !isBalanceHidden;
+                          },
+                        ),
                         loading: () => const SizedBox(
                           height: 170,
                           child: AppShimmer(
@@ -97,11 +124,28 @@ class DashboardScreen extends ConsumerWidget {
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      accountState.when(
+                        data: (accounts) => _buildCompactAccountSwitcher(
+                          context,
+                          ref,
+                          accounts: accounts,
+                          activeId: activeAccountId,
+                          balances: balances,
+                          hideAmount: isBalanceHidden,
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
 
                       const SizedBox(height: 32),
                       _buildQuickActions(context),
                       const SizedBox(height: 18),
-                      _buildGoalsSummaryCard(context, isDark: isDark),
+                      _buildGoalsSummaryCard(
+                        context,
+                        isDark: isDark,
+                        hideAmount: isBalanceHidden,
+                      ),
                       const SizedBox(height: 32),
 
                       // Header Recent Transactions
@@ -117,7 +161,7 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           ),
                           TextButton(
-                            onPressed: () => context.push('/transactions'),
+                            onPressed: () => context.go('/transactions'),
                             child: Text(
                               t('Lihat Semua', 'See All'),
                               style: const TextStyle(color: Color(0xFF4F6EF7)),
@@ -168,6 +212,89 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   // --- WIDGET KOMPONEN ---
+
+  Widget _buildCompactAccountSwitcher(
+    BuildContext context,
+    WidgetRef ref, {
+    required List<AccountModel> accounts,
+    required String? activeId,
+    required Map<String, double> balances,
+    required bool hideAmount,
+  }) {
+    if (accounts.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: accounts.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final account = accounts[index];
+          final selected = account.id == activeId;
+          final balance = balances[account.id] ?? account.initialBalance;
+          return InkWell(
+            onTap: () => ref
+                .read(accountNotifierProvider.notifier)
+                .switchAccount(account.id),
+            borderRadius: BorderRadius.circular(999),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            overlayColor: const WidgetStatePropertyAll<Color>(
+              Colors.transparent,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFF4F6EF7).withValues(alpha: 0.14)
+                    : (isDark
+                          ? const Color(0xFF1A2033)
+                          : const Color(0xFFEFF3FF)),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF4F6EF7)
+                      : (isDark ? Colors.white12 : const Color(0xFFD8E1F7)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    accountIconData(account.icon),
+                    size: 14,
+                    color: selected
+                        ? const Color(0xFF4F6EF7)
+                        : (isDark ? Colors.white70 : const Color(0xFF425173)),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    account.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    hideAmount
+                        ? '••••'
+                        : CurrencySettings.formatCompact(balance),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isDark ? Colors.white60 : const Color(0xFF5B6275),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   Widget _buildAppBar(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -222,16 +349,25 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildBalanceCard(
     List<TransactionModel> transactions, {
     required bool isDark,
+    required double balanceValue,
+    required bool hideAmount,
+    required VoidCallback onToggleHide,
   }) {
     // Hitung total dari data transaksi real.
     double totalIncome = transactions
-        .where((t) => t.type == 'income')
+        .where(
+          (t) =>
+              t.type == 'income' ||
+              (t.type == 'transfer' && t.transferDirection == 'in'),
+        )
         .fold(0, (sum, t) => sum + t.amount);
     double totalExpense = transactions
-        .where((t) => t.type == 'expense')
+        .where(
+          (t) =>
+              t.type == 'expense' ||
+              (t.type == 'transfer' && t.transferDirection == 'out'),
+        )
         .fold(0, (sum, t) => sum + t.amount);
-    double balance = totalIncome - totalExpense;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -256,30 +392,69 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            AppText.t(id: 'Total Saldo', en: 'Total Balance'),
-            style: TextStyle(
-              color: isDark ? Colors.white70 : const Color(0xFF5B6275),
-              fontSize: 13,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  AppText.t(id: 'Total Saldo', en: 'Total Balance'),
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : const Color(0xFF5B6275),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onToggleHide,
+                iconSize: 20,
+                splashRadius: 18,
+                color: isDark ? Colors.white70 : const Color(0xFF5B6275),
+                tooltip: hideAmount
+                    ? AppText.t(id: 'Tampilkan saldo', en: 'Show balance')
+                    : AppText.t(id: 'Sembunyikan saldo', en: 'Hide balance'),
+                icon: Icon(
+                  hideAmount
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: balance),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              final formattedValue = CurrencySettings.format(value);
-              return Text(
-                formattedValue,
+          const SizedBox(height: 4),
+          if (hideAmount)
+            Text(
+              '••••••',
+              key: const ValueKey<String>('hidden-balance'),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          else
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 340),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final offset = Tween<Offset>(
+                  begin: const Offset(0, 0.12),
+                  end: Offset.zero,
+                ).animate(animation);
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(position: offset, child: child),
+                );
+              },
+              child: Text(
+                CurrencySettings.format(balanceValue),
+                key: ValueKey<String>(balanceValue.toStringAsFixed(2)),
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF1A1E2A),
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
                 ),
-              );
-            },
-          ),
+              ),
+            ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -288,6 +463,7 @@ class DashboardScreen extends ConsumerWidget {
                   AppText.t(id: 'Pemasukan', en: 'Income'),
                   totalIncome,
                   true,
+                  hideAmount: hideAmount,
                   isDark: isDark,
                 ),
               ),
@@ -297,6 +473,7 @@ class DashboardScreen extends ConsumerWidget {
                   AppText.t(id: 'Pengeluaran', en: 'Expense'),
                   totalExpense,
                   false,
+                  hideAmount: hideAmount,
                   isDark: isDark,
                 ),
               ),
@@ -311,11 +488,12 @@ class DashboardScreen extends ConsumerWidget {
     String title,
     double amount,
     bool isIncome, {
+    required bool hideAmount,
     required bool isDark,
   }) {
     final color = isIncome ? const Color(0xFF00D4AA) : const Color(0xFFFF4C4C);
     final icon = isIncome ? Icons.south_west_rounded : Icons.north_east_rounded;
-    final formatted = CurrencySettings.format(amount);
+    final formatted = hideAmount ? '••••••' : CurrencySettings.format(amount);
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -376,16 +554,22 @@ class DashboardScreen extends ConsumerWidget {
         onTap: () => context.pushNamed('add-transaction'),
       ),
       (
-        icon: Icons.savings_rounded,
-        label: AppText.t(id: 'Target', en: 'Goals'),
+        icon: Icons.compare_arrows_rounded,
+        label: AppText.t(id: 'Transfer', en: 'Transfer'),
         color: const Color(0xFF00D4AA),
-        onTap: () => context.pushNamed('transfer'),
-      ),
-      (
-        icon: Icons.receipt_long_rounded,
-        label: AppText.t(id: 'Tagihan', en: 'Bills'),
-        color: const Color(0xFFFFB020),
-        onTap: () => context.push('/transactions'),
+        onTap: () async {
+          final transferred = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const TransferSheet(),
+          );
+          if (!context.mounted || transferred != true) return;
+          AppNotice.success(
+            context,
+            AppText.t(id: 'Transfer berhasil', en: 'Transfer successful'),
+          );
+        },
       ),
       (
         icon: Icons.bar_chart_rounded,
@@ -394,16 +578,10 @@ class DashboardScreen extends ConsumerWidget {
         onTap: () => context.pushNamed('analytics'),
       ),
       (
-        icon: Icons.account_balance_wallet_rounded,
+        icon: Icons.pie_chart_rounded,
         label: AppText.t(id: 'Budget', en: 'Budget'),
         color: const Color(0xFF8B5CF6),
         onTap: () => context.pushNamed('budget'),
-      ),
-      (
-        icon: Icons.settings_rounded,
-        label: AppText.t(id: 'Pengaturan', en: 'Settings'),
-        color: const Color(0xFF8B5CF6),
-        onTap: () => context.pushNamed('settings'),
       ),
     ];
 
@@ -430,7 +608,11 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGoalsSummaryCard(BuildContext context, {required bool isDark}) {
+  Widget _buildGoalsSummaryCard(
+    BuildContext context, {
+    required bool isDark,
+    required bool hideAmount,
+  }) {
     final titleColor = isDark ? Colors.white : const Color(0xFF1A1E2A);
     final muted = isDark ? Colors.white60 : const Color(0xFF5B6275);
     return FutureBuilder<_GoalSummary?>(
@@ -521,7 +703,7 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '${(pct * 100).toStringAsFixed(1)}%',
+                      hideAmount ? '•••' : '${(pct * 100).toStringAsFixed(1)}%',
                       style: const TextStyle(
                         color: Color(0xFF2E90FA),
                         fontWeight: FontWeight.w700,
@@ -545,7 +727,9 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${CurrencySettings.format(goal.current)} / ${CurrencySettings.format(goal.target)}',
+                  hideAmount
+                      ? '•••••• / ••••••'
+                      : '${CurrencySettings.format(goal.current)} / ${CurrencySettings.format(goal.target)}',
                   style: TextStyle(color: muted, fontSize: 12),
                 ),
               ],
@@ -655,7 +839,9 @@ class DashboardScreen extends ConsumerWidget {
     required Color muted,
     required Color title,
   }) {
-    final isIncome = tx.type == 'income';
+    final isIncome =
+        tx.type == 'income' ||
+        (tx.type == 'transfer' && tx.transferDirection == 'in');
     final amountColor = isIncome
         ? const Color(0xFF00D4AA)
         : const Color(0xFFFF4C4C);

@@ -59,7 +59,10 @@ class BudgetRepository {
     await _offlineStore.writePendingBudgetOps(userId, remaining);
   }
 
-  Future<List<BudgetUsageModel>> fetchBudgetUsage(DateTime month) async {
+  Future<List<BudgetUsageModel>> fetchBudgetUsage(
+    DateTime month, {
+    String? accountId,
+  }) async {
     final userId = await _resolveUserId();
 
     final monthStart = DateTime(month.year, month.month, 1);
@@ -81,13 +84,17 @@ class BudgetRepository {
           .select()
           .eq('user_id', userId)
           .eq('month', monthDateStr);
-      final transactionsResponse = await _supabase
+      var transactionsQuery = _supabase
           .from('transactions')
           .select()
           .eq('user_id', userId)
           .eq('type', 'expense')
           .gte('date', startStr)
           .lte('date', endStr);
+      if (accountId != null) {
+        transactionsQuery = transactionsQuery.eq('account_id', accountId);
+      }
+      final transactionsResponse = await transactionsQuery;
 
       budgets = (budgetsResponse as List).cast<Map<String, dynamic>>();
       transactions = (transactionsResponse as List)
@@ -101,10 +108,12 @@ class BudgetRepository {
           .toList();
       transactions = localTransactions.where((tx) {
         final type = (tx['type'] ?? '').toString();
+        final txAccountId = (tx['account_id'] ?? '').toString();
         final dateStr = (tx['date'] ?? '').toString();
         final dt = DateTime.tryParse(dateStr);
         if (dt == null) return false;
         return type == 'expense' &&
+            (accountId == null || txAccountId == accountId) &&
             !dt.isBefore(monthStart) &&
             dt.isBefore(monthEnd);
       }).toList();
