@@ -9,7 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../../../shared/services/language_settings.dart';
+import '../../../shared/models/transaction_model.dart';
 import '../../../shared/widgets/app_notice.dart';
+import '../../account/account_notifier.dart';
+import '../../account/account_repository.dart';
+import '../../transaction/transaction_notifier.dart';
 
 class TransferScreen extends ConsumerStatefulWidget {
   const TransferScreen({super.key});
@@ -301,39 +305,103 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
 
   Future<void> _showDepositDialog(_GoalItem goal) async {
     final amountC = TextEditingController();
+    final noteC = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ok = await showDialog<bool>(
+    final accounts = ref.read(accountNotifierProvider).valueOrNull ?? const [];
+    if (accounts.isEmpty) {
+      AppNotice.warning(
+        context,
+        _t(
+          'Buat akun dulu sebelum menambah setoran',
+          'Create an account before adding deposit',
+        ),
+      );
+      return;
+    }
+
+    var selectedAccountId =
+        ref.read(activeAccountIdProvider) ?? accounts.first.id;
+    if (!accounts.any((a) => a.id == selectedAccountId)) {
+      selectedAccountId = accounts.first.id;
+    }
+
+    final result = await showDialog<(bool, String?)>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          title: Text(_t('Tambah Setoran', 'Add Deposit')),
-          content: TextField(
-            controller: amountC,
-            keyboardType: TextInputType.number,
-            inputFormatters: [_CurrencyThousandsFormatter()],
-            style: TextStyle(
-              color: isDark ? Colors.white : const Color(0xFF1A1E2A),
-            ),
-            decoration: InputDecoration(
-              prefixText: CurrencySettings.current.symbol,
-              hintText: _t('Nominal setoran', 'Deposit amount'),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(_t('Batal', 'Cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(_t('Simpan', 'Save')),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text(_t('Tambah Setoran', 'Add Deposit')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedAccountId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: _t('Akun Sumber', 'Source Account'),
+                      ),
+                      items: accounts.map((a) {
+                        return DropdownMenuItem<String>(
+                          value: a.id,
+                          child: Text(a.name, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setLocal(() => selectedAccountId = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: amountC,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [_CurrencyThousandsFormatter()],
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: CurrencySettings.current.symbol,
+                        hintText: _t('Nominal setoran', 'Deposit amount'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: noteC,
+                      textInputAction: TextInputAction.done,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _t('Catatan (opsional)', 'Note (optional)'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, (false, null)),
+                  child: Text(_t('Batal', 'Cancel')),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, (true, selectedAccountId)),
+                  child: Text(_t('Simpan', 'Save')),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
-    if (ok != true) return;
+    final ok = result?.$1 ?? false;
+    final accountId = result?.$2;
+    if (!ok || accountId == null) return;
+
     final value = _parse(amountC.text);
     if (value <= 0) {
       if (!mounted) return;
@@ -343,6 +411,46 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       );
       return;
     }
+
+    final selectedAccount = accounts.firstWhere(
+      (a) => a.id == accountId,
+      orElse: () => accounts.first,
+    );
+    final accountRepo = ref.read(accountRepositoryProvider);
+    final balance = await accountRepo.getBalance(selectedAccount.id);
+    if (value > balance) {
+      if (!mounted) return;
+      AppNotice.warning(
+        context,
+        _t(
+          'Saldo akun tidak cukup untuk setoran ini',
+          'Account balance is not enough for this deposit',
+        ),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final noteSuffix = noteC.text.trim();
+    final txNote = noteSuffix.isEmpty
+        ? '${_t('Setoran Target', 'Goal Deposit')}: ${goal.title}'
+        : '${_t('Setoran Target', 'Goal Deposit')}: ${goal.title} - $noteSuffix';
+    await ref
+        .read(transactionNotifierProvider.notifier)
+        .addTransaction(
+          TransactionModel(
+            id: '',
+            userId: '',
+            amount: value,
+            type: 'expense',
+            category: 'Savings Goal',
+            note: txNote,
+            accountId: selectedAccount.id,
+            date: now,
+            createdAt: now,
+          ),
+        );
+
     setState(() {
       final idx = _goals.indexWhere((e) => e.id == goal.id);
       if (idx >= 0) {
@@ -352,10 +460,14 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       }
     });
     await _saveGoals();
+    ref.invalidate(accountBalancesProvider);
     if (!mounted) return;
     AppNotice.success(
       context,
-      _t('Setoran berhasil ditambahkan', 'Deposit added successfully'),
+      _t(
+        'Setoran berhasil dari akun ${selectedAccount.name}',
+        'Deposit added from ${selectedAccount.name}',
+      ),
     );
   }
 
@@ -412,6 +524,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         backgroundColor: Colors.transparent,
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_transfer_add_goal',
         onPressed: () => _showGoalForm(),
         backgroundColor: const Color(0xFF2E90FA),
         icon: const Icon(Icons.add, color: Colors.white),

@@ -38,16 +38,26 @@ class BudgetRepository {
         final type = (op['op'] ?? '').toString();
         final payload = Map<String, dynamic>.from(op['payload'] as Map);
         if (type == 'upsert') {
+          final payloadSpace = payload['space_id']?.toString();
           await _supabase
               .from('budgets')
-              .upsert(payload, onConflict: 'user_id, category, month');
+              .upsert(
+                payload,
+                onConflict: payloadSpace == null || payloadSpace.isEmpty
+                    ? 'user_id, category, month'
+                    : 'space_id, category, month',
+              );
         } else if (type == 'delete') {
-          await _supabase
+          var query = _supabase
               .from('budgets')
               .delete()
-              .eq('user_id', userId)
               .eq('category', (payload['category'] ?? '').toString())
               .eq('month', (payload['month'] ?? '').toString());
+          final payloadSpace = payload['space_id']?.toString();
+          query = payloadSpace == null || payloadSpace.isEmpty
+              ? query.eq('user_id', userId).isFilter('space_id', null)
+              : query.eq('space_id', payloadSpace);
+          await query;
         } else {
           remaining.add(op);
         }
@@ -59,7 +69,11 @@ class BudgetRepository {
     await _offlineStore.writePendingBudgetOps(userId, remaining);
   }
 
-  Future<List<BudgetUsageModel>> fetchBudgetUsage(DateTime month) async {
+  Future<List<BudgetUsageModel>> fetchBudgetUsage(
+    DateTime month, {
+    String? accountId,
+    String? spaceId,
+  }) async {
     final userId = await _resolveUserId();
 
     final monthStart = DateTime(month.year, month.month, 1);
@@ -76,35 +90,55 @@ class BudgetRepository {
       if (_canHitRemote) {
         await _syncPendingBudgetOps(userId);
       }
-      final budgetsResponse = await _supabase
+      var budgetsQuery = _supabase
           .from('budgets')
           .select()
-          .eq('user_id', userId)
           .eq('month', monthDateStr);
-      final transactionsResponse = await _supabase
+      budgetsQuery = spaceId == null
+          ? budgetsQuery.eq('user_id', userId).isFilter('space_id', null)
+          : budgetsQuery.eq('space_id', spaceId);
+      final budgetsData = await budgetsQuery;
+      var transactionsQuery = _supabase
           .from('transactions')
           .select()
-          .eq('user_id', userId)
           .eq('type', 'expense')
           .gte('date', startStr)
           .lte('date', endStr);
+      if (spaceId == null) {
+        transactionsQuery = transactionsQuery
+            .eq('user_id', userId)
+            .isFilter('space_id', null);
+      } else {
+        transactionsQuery = transactionsQuery.eq('space_id', spaceId);
+      }
+      if (accountId != null) {
+        transactionsQuery = transactionsQuery.eq('account_id', accountId);
+      }
+      final transactionsResponse = await transactionsQuery;
 
-      budgets = (budgetsResponse as List).cast<Map<String, dynamic>>();
+      budgets = (budgetsData as List).cast<Map<String, dynamic>>();
       transactions = (transactionsResponse as List)
           .cast<Map<String, dynamic>>();
       await _offlineStore.writeBudgets(userId, budgets);
     } catch (_) {
       final localBudgets = await _offlineStore.readBudgets(userId);
       final localTransactions = await _offlineStore.readTransactions(userId);
-      budgets = localBudgets
-          .where((b) => (b['month'] ?? '').toString() == monthDateStr)
-          .toList();
+      budgets = localBudgets.where((b) {
+        final monthMatch = (b['month'] ?? '').toString() == monthDateStr;
+        final bSpace = b['space_id']?.toString();
+        final bySpace = spaceId == null ? bSpace == null : bSpace == spaceId;
+        return monthMatch && bySpace;
+      }).toList();
       transactions = localTransactions.where((tx) {
         final type = (tx['type'] ?? '').toString();
+        final txAccountId = (tx['account_id'] ?? '').toString();
+        final txSpace = tx['space_id']?.toString();
         final dateStr = (tx['date'] ?? '').toString();
         final dt = DateTime.tryParse(dateStr);
         if (dt == null) return false;
         return type == 'expense' &&
+            (spaceId == null ? txSpace == null : txSpace == spaceId) &&
+            (accountId == null || txAccountId == accountId) &&
             !dt.isBefore(monthStart) &&
             dt.isBefore(monthEnd);
       }).toList();
@@ -146,6 +180,7 @@ class BudgetRepository {
     String category,
     double limitAmount,
     DateTime month,
+    String? spaceId,
   ) async {
     final userId = await _resolveUserId();
 
@@ -155,6 +190,7 @@ class BudgetRepository {
       'category': category,
       'limit_amount': limitAmount,
       'month': formattedMonth,
+      'space_id': spaceId,
     };
 
     await _offlineStore.upsertBudget(userId, row);
@@ -165,13 +201,22 @@ class BudgetRepository {
     try {
       await _supabase
           .from('budgets')
-          .upsert(row, onConflict: 'user_id, category, month');
+          .upsert(
+            row,
+            onConflict: spaceId == null
+                ? 'user_id, category, month'
+                : 'space_id, category, month',
+          );
     } catch (_) {
       await _offlineStore.enqueuePendingBudgetOp(userId, 'upsert', row);
     }
   }
 
-  Future<void> deleteBudget(String category, DateTime month) async {
+  Future<void> deleteBudget(
+    String category,
+    DateTime month,
+    String? spaceId,
+  ) async {
     final userId = await _resolveUserId();
     final formattedMonth = DateFormat('yyyy-MM-01').format(month);
 
@@ -180,20 +225,25 @@ class BudgetRepository {
       await _offlineStore.enqueuePendingBudgetOp(userId, 'delete', {
         'category': category,
         'month': formattedMonth,
+        'space_id': spaceId,
       });
       return;
     }
     try {
-      await _supabase
+      var query = _supabase
           .from('budgets')
           .delete()
-          .eq('user_id', userId)
           .eq('category', category)
           .eq('month', formattedMonth);
+      query = spaceId == null
+          ? query.eq('user_id', userId).isFilter('space_id', null)
+          : query.eq('space_id', spaceId);
+      await query;
     } catch (_) {
       await _offlineStore.enqueuePendingBudgetOp(userId, 'delete', {
         'category': category,
         'month': formattedMonth,
+        'space_id': spaceId,
       });
     }
   }

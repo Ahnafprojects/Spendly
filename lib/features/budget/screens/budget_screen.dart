@@ -38,6 +38,7 @@ class BudgetScreen extends ConsumerWidget {
         centerTitle: true,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_budget_add',
         onPressed: () => _showAddBudgetSheet(context),
         backgroundColor: const Color(0xFF4F6EF7),
         child: const Icon(Icons.add, color: Colors.white),

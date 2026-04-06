@@ -43,22 +43,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     final authService = ref.read(authServiceProvider);
     final prefs = await SharedPreferences.getInstance();
-
-    // Cek apakah user sudah melihat onboarding
-    final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
-
-    // Cek session Supabase
     final session = authService.currentSession;
     if (!mounted) return;
 
     if (session != null) {
-      // Jika sudah login, langsung ke dashboard
-      context.goNamed('dashboard');
-    } else if (!hasSeenOnboarding) {
-      // Jika belum login dan belum lihat onboarding
-      context.goNamed('onboarding');
+      // Logged-in user: check if they need to complete onboarding.
+      // onboarding_completed == false means new user explicitly sent to onboarding.
+      // null means existing user (before this feature) — go straight to dashboard.
+      final onboardingVal = prefs.getBool('onboarding_completed');
+      if (onboardingVal == false) {
+        context.goNamed('onboarding');
+      } else {
+        context.goNamed('dashboard');
+      }
     } else {
-      // Jika belum login tapi sudah lihat onboarding
       context.goNamed('auth');
     }
   }

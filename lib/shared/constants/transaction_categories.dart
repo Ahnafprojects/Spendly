@@ -88,6 +88,7 @@ const Map<String, Map<String, String>> _localizedCategoryLabels = {
     'bungatabungan': 'Bunga Tabungan',
     'refund': 'Refund',
     'hadiah': 'Hadiah',
+    'savingsgoal': 'Target Tabungan',
     'lainnya': 'Lainnya',
   },
   'en': {
@@ -129,6 +130,7 @@ const Map<String, Map<String, String>> _localizedCategoryLabels = {
     'bungatabungan': 'Savings Interest',
     'refund': 'Refund',
     'hadiah': 'Gift',
+    'savingsgoal': 'Savings Goal',
     'lainnya': 'Others',
   },
 };
@@ -208,6 +210,10 @@ String normalizeCategoryKey(String input) {
   if (lettersOnly.contains('dividen') || lettersOnly.contains('investasi')) {
     return 'investasi';
   }
+  if (lettersOnly.contains('savingsgoal') ||
+      (lettersOnly.contains('target') && lettersOnly.contains('tabungan'))) {
+    return 'savingsgoal';
+  }
   if (lettersOnly.contains('bunga') || lettersOnly.contains('tabungan')) {
     return 'bungatabungan';
   }
@@ -258,6 +264,7 @@ IconData categoryIconFor(String category) {
   if (key == 'usaha') return Icons.storefront_rounded;
   if (key == 'investasi') return Icons.trending_up_rounded;
   if (key == 'bungatabungan') return Icons.savings_rounded;
+  if (key == 'savingsgoal') return Icons.flag_rounded;
   if (key == 'refund') return Icons.assignment_return_rounded;
   if (key == 'hadiah') return Icons.card_giftcard_rounded;
 

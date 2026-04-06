@@ -59,8 +59,7 @@ class TransactionRepository {
           await _supabase
               .from('transactions')
               .delete()
-              .eq('id', (payload['id'] ?? '').toString())
-              .eq('user_id', userId);
+              .eq('id', (payload['id'] ?? '').toString());
         } else {
           remaining.add(op);
         }
@@ -73,71 +72,110 @@ class TransactionRepository {
   }
 
   // Mengambil 10 transaksi terakhir user
-  Future<List<TransactionModel>> fetchRecent([int limit = 10]) async {
+  Future<List<TransactionModel>> fetchRecent({
+    int limit = 10,
+    String? accountId,
+    String? spaceId,
+  }) async {
     final userId = await _resolveUserId();
 
     try {
       if (_canHitRemote) {
         await _syncPendingOps(userId);
       }
-      final response = await _supabase
+      var query = _supabase
           .from('transactions')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false)
-          .limit(limit);
+          .select('*, profiles(full_name)');
+      if (spaceId == null) {
+        query = query.eq('user_id', userId).isFilter('space_id', null);
+      } else {
+        query = query.eq('space_id', spaceId);
+      }
+      if (accountId != null) {
+        query = query.eq('account_id', accountId);
+      }
+      final response = await query.order('date', ascending: false).limit(limit);
       final rows = (response as List).cast<Map<String, dynamic>>();
       await _offlineStore.writeTransactions(userId, rows);
       return rows.map(TransactionModel.fromJson).toList();
     } catch (_) {
       final local = await _offlineStore.readTransactions(userId);
-      local.sort((a, b) {
+      final localFiltered = local.where((tx) {
+        final txAccountId = (tx['account_id'] ?? '').toString();
+        final txSpaceId = tx['space_id']?.toString();
+        final bySpace = spaceId == null
+            ? txSpaceId == null
+            : txSpaceId == spaceId;
+        final byAccount = accountId == null || txAccountId == accountId;
+        return bySpace && byAccount;
+      }).toList();
+      localFiltered.sort((a, b) {
         final ad =
             DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime(1970);
         final bd =
             DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime(1970);
         return bd.compareTo(ad);
       });
-      return local.take(limit).map(TransactionModel.fromJson).toList();
+      return localFiltered.take(limit).map(TransactionModel.fromJson).toList();
     }
   }
 
   // Mengambil SEMUA transaksi user
-  Future<List<TransactionModel>> fetchAll() async {
+  Future<List<TransactionModel>> fetchAll({
+    String? accountId,
+    String? spaceId,
+  }) async {
     final userId = await _resolveUserId();
 
     try {
       if (_canHitRemote) {
         await _syncPendingOps(userId);
       }
-      final response = await _supabase
+      var query = _supabase
           .from('transactions')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
+          .select('*, profiles(full_name)');
+      if (spaceId == null) {
+        query = query.eq('user_id', userId).isFilter('space_id', null);
+      } else {
+        query = query.eq('space_id', spaceId);
+      }
+      if (accountId != null) {
+        query = query.eq('account_id', accountId);
+      }
+      final response = await query.order('date', ascending: false);
       final rows = (response as List).cast<Map<String, dynamic>>();
       await _offlineStore.writeTransactions(userId, rows);
       return rows.map(TransactionModel.fromJson).toList();
     } catch (_) {
       final local = await _offlineStore.readTransactions(userId);
-      local.sort((a, b) {
+      final localFiltered = local.where((tx) {
+        final txAccountId = (tx['account_id'] ?? '').toString();
+        final txSpaceId = tx['space_id']?.toString();
+        final bySpace = spaceId == null
+            ? txSpaceId == null
+            : txSpaceId == spaceId;
+        final byAccount = accountId == null || txAccountId == accountId;
+        return bySpace && byAccount;
+      }).toList();
+      localFiltered.sort((a, b) {
         final ad =
             DateTime.tryParse((a['date'] ?? '').toString()) ?? DateTime(1970);
         final bd =
             DateTime.tryParse((b['date'] ?? '').toString()) ?? DateTime(1970);
         return bd.compareTo(ad);
       });
-      return local.map(TransactionModel.fromJson).toList();
+      return localFiltered.map(TransactionModel.fromJson).toList();
     }
   }
 
   // Menambahkan transaksi baru
-  Future<void> insert(TransactionModel transaction) async {
+  Future<void> insert(TransactionModel transaction, {String? spaceId}) async {
     final userId = await _resolveUserId();
 
     final row = transaction.toJson()
       ..['id'] = transaction.id.isEmpty ? _generateUuidV4() : transaction.id
       ..['user_id'] = userId
+      ..['space_id'] = spaceId
       ..['created_at'] = transaction.createdAt.toIso8601String();
 
     await _offlineStore.upsertTransaction(userId, row);
@@ -153,10 +191,12 @@ class TransactionRepository {
   }
 
   // Memperbarui transaksi yang sudah ada
-  Future<void> update(TransactionModel transaction) async {
+  Future<void> update(TransactionModel transaction, {String? spaceId}) async {
     final userId = await _resolveUserId();
 
-    final row = transaction.toJson()..['user_id'] = userId;
+    final row = transaction.toJson()
+      ..['user_id'] = userId
+      ..['space_id'] = spaceId;
     await _offlineStore.upsertTransaction(userId, row);
     if (!_canHitRemote) {
       await _offlineStore.enqueuePendingTxOp(userId, 'upsert', row);
@@ -179,11 +219,7 @@ class TransactionRepository {
       return;
     }
     try {
-      await _supabase
-          .from('transactions')
-          .delete()
-          .eq('id', id)
-          .eq('user_id', userId);
+      await _supabase.from('transactions').delete().eq('id', id);
     } catch (_) {
       await _offlineStore.enqueuePendingTxOp(userId, 'delete', {'id': id});
     }

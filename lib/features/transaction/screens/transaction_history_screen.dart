@@ -7,6 +7,8 @@ import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_shimmer.dart';
+import '../../account/account_notifier.dart';
+import '../../spaces/space_notifier.dart';
 import 'transaction_detail_screen.dart';
 import '../transaction_repository.dart';
 
@@ -24,6 +26,8 @@ class _TransactionHistoryScreenState
   final _searchController = TextEditingController();
   String _query = '';
   DateTime? _selectedDate;
+  String? _lastAccountId;
+  String? _lastSpaceId;
 
   String _t(String id, String en) => AppText.t(id: id, en: en);
 
@@ -40,11 +44,17 @@ class _TransactionHistoryScreenState
   }
 
   Future<List<TransactionModel>> _load() {
-    return ref.read(transactionRepositoryProvider).fetchAll();
+    final accountId = ref.read(activeAccountIdProvider);
+    final spaceId = ref.read(activeSpaceIdProvider);
+    return ref
+        .read(transactionRepositoryProvider)
+        .fetchAll(accountId: accountId, spaceId: spaceId);
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
     await _future;
   }
 
@@ -65,6 +75,18 @@ class _TransactionHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
+    final activeAccountId = ref.watch(activeAccountIdProvider);
+    final activeSpaceId = ref.watch(activeSpaceIdProvider);
+    if (_lastAccountId != activeAccountId || _lastSpaceId != activeSpaceId) {
+      _lastAccountId = activeAccountId;
+      _lastSpaceId = activeSpaceId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _future = _load();
+        });
+      });
+    }
     ref.watch(appLanguageProvider);
     ref.watch(appCurrencyProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -241,7 +263,9 @@ class _TransactionHistoryScreenState
                   ),
                 ...List.generate(dateFiltered.length, (index) {
                   final tx = dateFiltered[index];
-                  final isIncome = tx.type == 'income';
+                  final isIncome =
+                      tx.type == 'income' ||
+                      (tx.type == 'transfer' && tx.transferDirection == 'in');
                   final sign = isIncome ? '+' : '-';
                   final amountColor = isIncome
                       ? const Color(0xFF00D4AA)
@@ -318,7 +342,10 @@ class _TransactionHistoryScreenState
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '${localizeCategory(tx.category)} • $date',
+                                    activeSpaceId != null &&
+                                            tx.userName?.isNotEmpty == true
+                                        ? '${localizeCategory(tx.category)} • $date\nBy: ${tx.userName}'
+                                        : '${localizeCategory(tx.category)} • $date',
                                     style: TextStyle(
                                       color: muted,
                                       fontSize: 12,

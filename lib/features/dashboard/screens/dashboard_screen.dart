@@ -1,20 +1,42 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../../../shared/services/language_settings.dart';
 import '../../../shared/constants/transaction_categories.dart';
+import '../../account/account_model.dart';
+import '../../account/account_notifier.dart';
+import '../../account/widgets/transfer_sheet.dart';
+import '../../analytics/analytics_repository.dart';
+import '../../spaces/space_notifier.dart';
 import '../../transaction/transaction_notifier.dart';
 import '../../transaction/screens/transaction_detail_screen.dart';
 import '../../../shared/models/transaction_model.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_shimmer.dart';
+
+final dashboardBalanceHiddenProvider = StateProvider<bool>((ref) => false);
+final dashboardMonthlyExpenseBreakdownProvider =
+    FutureProvider<List<CategoryMetric>>((ref) async {
+      ref.watch(transactionNotifierProvider);
+      final repo = ref.watch(analyticsRepositoryProvider);
+      final accountId = ref.watch(activeAccountIdProvider);
+      final spaceId = ref.watch(activeSpaceIdProvider);
+      final now = DateTime.now();
+      final start = DateTime(now.year, now.month, 1);
+      final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      final transactions = await repo.fetchTransactionsByDateRange(
+        start,
+        end,
+        accountId: accountId,
+        spaceId: spaceId,
+      );
+      return repo.getCategoryBreakdown(transactions);
+    });
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -25,6 +47,16 @@ class DashboardScreen extends ConsumerWidget {
     ref.watch(appCurrencyProvider);
     String t(String id, String en) => AppText.t(id: id, en: en);
     final transactionState = ref.watch(transactionNotifierProvider);
+    final accountState = ref.watch(accountNotifierProvider);
+    final activeAccountId = ref.watch(activeAccountIdProvider);
+    final activeAccount = ref.watch(activeAccountProvider);
+    final balances =
+        ref.watch(accountBalancesProvider).valueOrNull ??
+        const <String, double>{};
+    final isBalanceHidden = ref.watch(dashboardBalanceHiddenProvider);
+    final currentBalance = activeAccount == null
+        ? 0.0
+        : (balances[activeAccount.id] ?? activeAccount.initialBalance);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0A0A0F) : const Color(0xFFF4F7FC);
     final card = isDark ? const Color(0xFF141420) : Colors.white;
@@ -51,6 +83,7 @@ class DashboardScreen extends ConsumerWidget {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: 'fab_dashboard_add_transaction',
           onPressed: () => context.pushNamed('add-transaction'),
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -61,8 +94,10 @@ class DashboardScreen extends ConsumerWidget {
         child: RefreshIndicator(
           color: const Color(0xFF4F6EF7),
           backgroundColor: isDark ? const Color(0xFF1C1C2E) : Colors.white,
-          onRefresh: () =>
-              ref.read(transactionNotifierProvider.notifier).refresh(),
+          onRefresh: () async {
+            await ref.read(transactionNotifierProvider.notifier).refresh();
+            ref.invalidate(dashboardMonthlyExpenseBreakdownProvider);
+          },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
@@ -72,13 +107,25 @@ class DashboardScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildAppBar(context),
+                      _buildAppBar(context, ref),
                       const SizedBox(height: 32),
 
                       // Hero Element: Balance Card
                       transactionState.when(
-                        data: (transactions) =>
-                            _buildBalanceCard(transactions, isDark: isDark),
+                        data: (transactions) => _buildBalanceCard(
+                          transactions,
+                          isDark: isDark,
+                          balanceValue: currentBalance,
+                          hideAmount: isBalanceHidden,
+                          onToggleHide: () {
+                            ref
+                                    .read(
+                                      dashboardBalanceHiddenProvider.notifier,
+                                    )
+                                    .state =
+                                !isBalanceHidden;
+                          },
+                        ),
                         loading: () => const SizedBox(
                           height: 170,
                           child: AppShimmer(
@@ -97,11 +144,22 @@ class DashboardScreen extends ConsumerWidget {
                           style: const TextStyle(color: Colors.red),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      accountState.when(
+                        data: (accounts) => _buildCompactAccountSwitcher(
+                          context,
+                          ref,
+                          accounts: accounts,
+                          activeId: activeAccountId,
+                          balances: balances,
+                          hideAmount: isBalanceHidden,
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
 
                       const SizedBox(height: 32),
                       _buildQuickActions(context),
-                      const SizedBox(height: 18),
-                      _buildGoalsSummaryCard(context, isDark: isDark),
                       const SizedBox(height: 32),
 
                       // Header Recent Transactions
@@ -117,7 +175,7 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           ),
                           TextButton(
-                            onPressed: () => context.push('/transactions'),
+                            onPressed: () => context.go('/transactions'),
                             child: Text(
                               t('Lihat Semua', 'See All'),
                               style: const TextStyle(color: Color(0xFF4F6EF7)),
@@ -157,6 +215,18 @@ class DashboardScreen extends ConsumerWidget {
                 error: (_, __) =>
                     const SliverToBoxAdapter(child: SizedBox.shrink()),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 10),
+                  child: _buildSimpleAnalyticsPie(
+                    context,
+                    ref,
+                    isDark: isDark,
+                    title: title,
+                    muted: muted,
+                  ),
+                ),
+              ),
               const SliverToBoxAdapter(
                 child: SizedBox(height: 80),
               ), // Padding bawah untuk FAB
@@ -169,14 +239,99 @@ class DashboardScreen extends ConsumerWidget {
 
   // --- WIDGET KOMPONEN ---
 
-  Widget _buildAppBar(BuildContext context) {
+  Widget _buildCompactAccountSwitcher(
+    BuildContext context,
+    WidgetRef ref, {
+    required List<AccountModel> accounts,
+    required String? activeId,
+    required Map<String, double> balances,
+    required bool hideAmount,
+  }) {
+    if (accounts.isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: accounts.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final account = accounts[index];
+          final selected = account.id == activeId;
+          final balance = balances[account.id] ?? account.initialBalance;
+          return InkWell(
+            onTap: () => ref
+                .read(accountNotifierProvider.notifier)
+                .switchAccount(account.id),
+            borderRadius: BorderRadius.circular(999),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            overlayColor: const WidgetStatePropertyAll<Color>(
+              Colors.transparent,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFF4F6EF7).withValues(alpha: 0.14)
+                    : (isDark
+                          ? const Color(0xFF1A2033)
+                          : const Color(0xFFEFF3FF)),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF4F6EF7)
+                      : (isDark ? Colors.white12 : const Color(0xFFD8E1F7)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    accountIconData(account.icon),
+                    size: 14,
+                    color: selected
+                        ? const Color(0xFF4F6EF7)
+                        : (isDark ? Colors.white70 : const Color(0xFF425173)),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    account.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    hideAmount
+                        ? '••••'
+                        : CurrencySettings.formatCompact(balance),
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: isDark ? Colors.white60 : const Color(0xFF5B6275),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = isDark ? Colors.white : const Color(0xFF1A1E2A);
     final muted = isDark ? Colors.white70 : const Color(0xFF5B6275);
-    final userEmail = Supabase.instance.client.auth.currentUser?.email;
-    final displayName = (userEmail != null && userEmail.isNotEmpty)
-        ? userEmail.split('@').first
-        : AppText.t(id: 'Pengguna', en: 'User');
+    final user = Supabase.instance.client.auth.currentUser;
+    final fullName = user?.userMetadata?['full_name']?.toString().trim();
+    final displayName = (fullName != null && fullName.isNotEmpty)
+        ? fullName.split(' ').first
+        : (user?.email?.split('@').first ??
+            AppText.t(id: 'Pengguna', en: 'User'));
     final dateLabel = DateFormat(
       'EEEE, d MMM',
       LanguageSettings.current.locale.toString(),
@@ -185,20 +340,22 @@ class DashboardScreen extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(dateLabel, style: TextStyle(color: muted, fontSize: 13)),
-            const SizedBox(height: 4),
-            Text(
-              '${AppText.t(id: 'Halo', en: 'Hi')}, $displayName',
-              style: TextStyle(
-                color: title,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(dateLabel, style: TextStyle(color: muted, fontSize: 13)),
+              const SizedBox(height: 6),
+              Text(
+                '${AppText.t(id: 'Halo', en: 'Hi')}, $displayName',
+                style: TextStyle(
+                  color: title,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         Container(
           height: 46,
@@ -222,16 +379,25 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildBalanceCard(
     List<TransactionModel> transactions, {
     required bool isDark,
+    required double balanceValue,
+    required bool hideAmount,
+    required VoidCallback onToggleHide,
   }) {
     // Hitung total dari data transaksi real.
     double totalIncome = transactions
-        .where((t) => t.type == 'income')
+        .where(
+          (t) =>
+              t.type == 'income' ||
+              (t.type == 'transfer' && t.transferDirection == 'in'),
+        )
         .fold(0, (sum, t) => sum + t.amount);
     double totalExpense = transactions
-        .where((t) => t.type == 'expense')
+        .where(
+          (t) =>
+              t.type == 'expense' ||
+              (t.type == 'transfer' && t.transferDirection == 'out'),
+        )
         .fold(0, (sum, t) => sum + t.amount);
-    double balance = totalIncome - totalExpense;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -256,30 +422,69 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            AppText.t(id: 'Total Saldo', en: 'Total Balance'),
-            style: TextStyle(
-              color: isDark ? Colors.white70 : const Color(0xFF5B6275),
-              fontSize: 13,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  AppText.t(id: 'Total Saldo', en: 'Total Balance'),
+                  style: TextStyle(
+                    color: isDark ? Colors.white70 : const Color(0xFF5B6275),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onToggleHide,
+                iconSize: 20,
+                splashRadius: 18,
+                color: isDark ? Colors.white70 : const Color(0xFF5B6275),
+                tooltip: hideAmount
+                    ? AppText.t(id: 'Tampilkan saldo', en: 'Show balance')
+                    : AppText.t(id: 'Sembunyikan saldo', en: 'Hide balance'),
+                icon: Icon(
+                  hideAmount
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: balance),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) {
-              final formattedValue = CurrencySettings.format(value);
-              return Text(
-                formattedValue,
+          const SizedBox(height: 4),
+          if (hideAmount)
+            Text(
+              '••••••',
+              key: const ValueKey<String>('hidden-balance'),
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          else
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 340),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final offset = Tween<Offset>(
+                  begin: const Offset(0, 0.12),
+                  end: Offset.zero,
+                ).animate(animation);
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(position: offset, child: child),
+                );
+              },
+              child: Text(
+                CurrencySettings.format(balanceValue),
+                key: ValueKey<String>(balanceValue.toStringAsFixed(2)),
                 style: TextStyle(
                   color: isDark ? Colors.white : const Color(0xFF1A1E2A),
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
                 ),
-              );
-            },
-          ),
+              ),
+            ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -288,6 +493,7 @@ class DashboardScreen extends ConsumerWidget {
                   AppText.t(id: 'Pemasukan', en: 'Income'),
                   totalIncome,
                   true,
+                  hideAmount: hideAmount,
                   isDark: isDark,
                 ),
               ),
@@ -297,6 +503,7 @@ class DashboardScreen extends ConsumerWidget {
                   AppText.t(id: 'Pengeluaran', en: 'Expense'),
                   totalExpense,
                   false,
+                  hideAmount: hideAmount,
                   isDark: isDark,
                 ),
               ),
@@ -311,11 +518,12 @@ class DashboardScreen extends ConsumerWidget {
     String title,
     double amount,
     bool isIncome, {
+    required bool hideAmount,
     required bool isDark,
   }) {
     final color = isIncome ? const Color(0xFF00D4AA) : const Color(0xFFFF4C4C);
     final icon = isIncome ? Icons.south_west_rounded : Icons.north_east_rounded;
-    final formatted = CurrencySettings.format(amount);
+    final formatted = hideAmount ? '••••••' : CurrencySettings.format(amount);
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -376,16 +584,22 @@ class DashboardScreen extends ConsumerWidget {
         onTap: () => context.pushNamed('add-transaction'),
       ),
       (
-        icon: Icons.savings_rounded,
-        label: AppText.t(id: 'Target', en: 'Goals'),
+        icon: Icons.compare_arrows_rounded,
+        label: AppText.t(id: 'Transfer', en: 'Transfer'),
         color: const Color(0xFF00D4AA),
-        onTap: () => context.pushNamed('transfer'),
-      ),
-      (
-        icon: Icons.receipt_long_rounded,
-        label: AppText.t(id: 'Tagihan', en: 'Bills'),
-        color: const Color(0xFFFFB020),
-        onTap: () => context.push('/transactions'),
+        onTap: () async {
+          final transferred = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const TransferSheet(),
+          );
+          if (!context.mounted || transferred != true) return;
+          AppNotice.success(
+            context,
+            AppText.t(id: 'Transfer berhasil', en: 'Transfer successful'),
+          );
+        },
       ),
       (
         icon: Icons.bar_chart_rounded,
@@ -394,16 +608,22 @@ class DashboardScreen extends ConsumerWidget {
         onTap: () => context.pushNamed('analytics'),
       ),
       (
-        icon: Icons.account_balance_wallet_rounded,
+        icon: Icons.pie_chart_rounded,
         label: AppText.t(id: 'Budget', en: 'Budget'),
         color: const Color(0xFF8B5CF6),
         onTap: () => context.pushNamed('budget'),
       ),
       (
-        icon: Icons.settings_rounded,
-        label: AppText.t(id: 'Pengaturan', en: 'Settings'),
-        color: const Color(0xFF8B5CF6),
-        onTap: () => context.pushNamed('settings'),
+        icon: Icons.savings_rounded,
+        label: AppText.t(id: 'Savings', en: 'Savings'),
+        color: const Color(0xFF2E90FA),
+        onTap: () => context.pushNamed('transfer'),
+      ),
+      (
+        icon: Icons.groups_rounded,
+        label: AppText.t(id: 'Shared', en: 'Shared'),
+        color: const Color(0xFF64748B),
+        onTap: () => context.pushNamed('members'),
       ),
     ];
 
@@ -428,161 +648,6 @@ class DashboardScreen extends ConsumerWidget {
         );
       },
     );
-  }
-
-  Widget _buildGoalsSummaryCard(BuildContext context, {required bool isDark}) {
-    final titleColor = isDark ? Colors.white : const Color(0xFF1A1E2A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF5B6275);
-    return FutureBuilder<_GoalSummary?>(
-      future: _loadTopGoal(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 86,
-            child: AppShimmer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.all(Radius.circular(16)),
-                ),
-              ),
-            ),
-          );
-        }
-        final goal = snapshot.data;
-        if (goal == null) {
-          return InkWell(
-            onTap: () => context.pushNamed('transfer'),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF151A2A) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.savings_rounded, color: Color(0xFF2E90FA)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      AppText.t(
-                        id: 'Belum ada target. Ketuk untuk membuat target pertama.',
-                        en: 'No goals yet. Tap to create your first savings goal.',
-                      ),
-                      style: TextStyle(color: muted, fontSize: 12.5),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Color(0xFF2E90FA),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-        final pct = (goal.current / goal.target).clamp(0.0, 1.0);
-        return InkWell(
-          onTap: () => context.pushNamed('transfer'),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151A2A) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.flag_rounded,
-                      color: Color(0xFF2E90FA),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${AppText.t(id: 'Target Utama', en: 'Top Goal')}: ${goal.title}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: titleColor,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${(pct * 100).toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        color: Color(0xFF2E90FA),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    minHeight: 8,
-                    value: pct,
-                    backgroundColor: isDark
-                        ? const Color(0xFF21314D)
-                        : const Color(0xFFE3ECFF),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF2E90FA),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${CurrencySettings.format(goal.current)} / ${CurrencySettings.format(goal.target)}',
-                  style: TextStyle(color: muted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<_GoalSummary?> _loadTopGoal() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('savings_goals_v1');
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return null;
-      final goals = decoded
-          .whereType<Map>()
-          .map((e) {
-            final m = Map<String, dynamic>.from(e);
-            return _GoalSummary(
-              title: (m['title'] ?? '').toString(),
-              target: (m['target'] as num?)?.toDouble() ?? 0,
-              current: (m['current'] as num?)?.toDouble() ?? 0,
-            );
-          })
-          .where((g) => g.target > 0)
-          .toList();
-      if (goals.isEmpty) return null;
-      goals.sort(
-        (a, b) => (b.current / b.target).compareTo(a.current / a.target),
-      );
-      return goals.first;
-    } catch (_) {
-      return null;
-    }
   }
 
   Widget _buildActionItem({
@@ -613,6 +678,163 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSimpleAnalyticsPie(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool isDark,
+    required Color title,
+    required Color muted,
+  }) {
+    final expenseState = ref.watch(dashboardMonthlyExpenseBreakdownProvider);
+    const pieColors = [
+      Color(0xFF4F6EF7),
+      Color(0xFF00D4AA),
+      Color(0xFFFF5A6E),
+      Color(0xFFFFB020),
+      Color(0xFF22C1C3),
+      Color(0xFF8B5CF6),
+    ];
+
+    return expenseState.when(
+      data: (items) {
+        if (items.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF151A2A) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.pie_chart_rounded,
+                  color: isDark ? Colors.white54 : const Color(0xFF7B88A6),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AppText.t(
+                      id: 'Belum ada pengeluaran bulan ini untuk ditampilkan.',
+                      en: 'No expense data this month to show.',
+                    ),
+                    style: TextStyle(color: muted, fontSize: 12.5),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final top = items.take(4).toList();
+        final total = top.fold<double>(0, (sum, e) => sum + e.amount);
+
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF151A2A) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: PieChart(
+                  PieChartData(
+                    centerSpaceRadius: 30,
+                    sectionsSpace: 2,
+                    borderData: FlBorderData(show: false),
+                    sections: top.asMap().entries.map((e) {
+                      return PieChartSectionData(
+                        value: e.value.amount,
+                        color: pieColors[e.key % pieColors.length],
+                        title: '',
+                        radius: 22,
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppText.t(
+                        id: 'Analitik Bulan Ini',
+                        en: 'This Month Analytics',
+                      ),
+                      style: TextStyle(
+                        color: title,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      CurrencySettings.format(total),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...top.asMap().entries.map((e) {
+                      final metric = e.value;
+                      final pct = total <= 0
+                          ? 0
+                          : (metric.amount / total * 100);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: pieColors[e.key % pieColors.length],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${localizeCategory(metric.category)} ${pct.toStringAsFixed(0)}% • ${CurrencySettings.formatCompact(metric.amount)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: muted,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox(
+        height: 130,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -655,7 +877,9 @@ class DashboardScreen extends ConsumerWidget {
     required Color muted,
     required Color title,
   }) {
-    final isIncome = tx.type == 'income';
+    final isIncome =
+        tx.type == 'income' ||
+        (tx.type == 'transfer' && tx.transferDirection == 'in');
     final amountColor = isIncome
         ? const Color(0xFF00D4AA)
         : const Color(0xFFFF4C4C);
@@ -765,16 +989,4 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
-}
-
-class _GoalSummary {
-  final String title;
-  final double target;
-  final double current;
-
-  const _GoalSummary({
-    required this.title,
-    required this.target,
-    required this.current,
-  });
 }
