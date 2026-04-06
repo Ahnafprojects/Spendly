@@ -1,19 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/services/app_text.dart';
+import '../../../shared/services/invitation_service.dart';
 import '../../account/screens/accounts_overview_screen.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../transaction/screens/transaction_history_screen.dart';
 
-class MainTabScreen extends StatelessWidget {
+class MainTabScreen extends ConsumerStatefulWidget {
   final int currentIndex;
 
   const MainTabScreen({super.key, required this.currentIndex});
 
+  @override
+  ConsumerState<MainTabScreen> createState() => _MainTabScreenState();
+}
+
+class _MainTabScreenState extends ConsumerState<MainTabScreen> {
+  bool _invitationChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_invitationChecked || widget.currentIndex != 0 || !mounted) return;
+      _invitationChecked = true;
+      try {
+        await ref
+            .read(invitationServiceProvider)
+            .promptPendingInvitations(context, ref);
+      } catch (_) {
+        // Keep dashboard usable even if invitation check fails.
+      }
+    });
+  }
+
   void _onTap(BuildContext context, int index) {
-    if (index == currentIndex) return;
+    if (index == widget.currentIndex) return;
     if (index == 0) {
       context.go('/dashboard');
       return;
@@ -39,9 +64,9 @@ class MainTabScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: currentIndex, children: pages),
+      body: IndexedStack(index: widget.currentIndex, children: pages),
       bottomNavigationBar: _MainBottomBar(
-        currentIndex: currentIndex,
+        currentIndex: widget.currentIndex,
         onTap: (index) => _onTap(context, index),
       ),
     );

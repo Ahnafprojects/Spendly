@@ -524,6 +524,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         backgroundColor: Colors.transparent,
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_transfer_add_goal',
         onPressed: () => _showGoalForm(),
         backgroundColor: const Color(0xFF2E90FA),
         icon: const Icon(Icons.add, color: Colors.white),

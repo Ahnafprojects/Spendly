@@ -54,6 +54,7 @@ class AccountsOverviewScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_accounts_add_account',
         backgroundColor: const Color(0xFF4F6EF7),
         onPressed: () async {
           final result = await showModalBottomSheet<AddAccountSheetResult>(

@@ -30,6 +30,7 @@ class TransferService {
     required String toId,
     required double amount,
     String? note,
+    String? spaceId,
   }) async {
     if (fromId == toId) {
       throw Exception(
@@ -66,6 +67,7 @@ class TransferService {
       'date': now.toIso8601String(),
       'created_at': now.toIso8601String(),
       'transfer_group_id': groupId,
+      'space_id': spaceId,
     };
 
     final rows = [

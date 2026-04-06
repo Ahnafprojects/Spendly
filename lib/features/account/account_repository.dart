@@ -49,12 +49,13 @@ class AccountRepository {
         '${b[10]}${b[11]}${b[12]}${b[13]}${b[14]}${b[15]}';
   }
 
-  Future<List<AccountModel>> fetchAll() async {
+  Future<List<AccountModel>> fetchAll({String? spaceId}) async {
     final userId = await _resolveUserId();
-    final response = await _supabase
-        .from('accounts')
-        .select()
-        .eq('user_id', userId)
+    var query = _supabase.from('accounts').select();
+    query = spaceId == null
+        ? query.eq('user_id', userId).isFilter('space_id', null)
+        : query.eq('space_id', spaceId);
+    final response = await query
         .order('is_default', ascending: false)
         .order('created_at', ascending: true);
     return (response as List)
@@ -63,15 +64,17 @@ class AccountRepository {
         .toList();
   }
 
-  Future<AccountModel> insert(AccountModel account) async {
+  Future<AccountModel> insert(AccountModel account, {String? spaceId}) async {
     final userId = await _resolveUserId();
     final accountName = account.name.trim();
-    final existing = await _supabase
+    var existingQuery = _supabase
         .from('accounts')
         .select('id')
-        .eq('user_id', userId)
-        .ilike('name', accountName)
-        .limit(1);
+        .ilike('name', accountName);
+    existingQuery = spaceId == null
+        ? existingQuery.eq('user_id', userId).isFilter('space_id', null)
+        : existingQuery.eq('space_id', spaceId);
+    final existing = await existingQuery.limit(1);
     if ((existing as List).isNotEmpty) {
       throw Exception(
         AppText.t(
@@ -81,15 +84,19 @@ class AccountRepository {
       );
     }
     if (account.isDefault) {
-      await _supabase
-          .from('accounts')
-          .update({'is_default': false})
-          .eq('user_id', userId);
+      var defaultQuery = _supabase.from('accounts').update({
+        'is_default': false,
+      });
+      defaultQuery = spaceId == null
+          ? defaultQuery.eq('user_id', userId).isFilter('space_id', null)
+          : defaultQuery.eq('space_id', spaceId);
+      await defaultQuery;
     }
     final row = account.toJson()
       ..['id'] = account.id.isEmpty ? _generateUuidV4() : account.id
       ..['name'] = accountName
-      ..['user_id'] = userId;
+      ..['user_id'] = userId
+      ..['space_id'] = spaceId;
     final inserted = await _supabase
         .from('accounts')
         .insert(row)
@@ -98,29 +105,35 @@ class AccountRepository {
     return AccountModel.fromJson(Map<String, dynamic>.from(inserted));
   }
 
-  Future<void> update(AccountModel account) async {
+  Future<void> update(AccountModel account, {String? spaceId}) async {
     final userId = await _resolveUserId();
     if (account.isDefault) {
-      await _supabase
+      var clearDefault = _supabase
           .from('accounts')
           .update({'is_default': false})
-          .eq('user_id', userId)
           .neq('id', account.id);
+      clearDefault = spaceId == null
+          ? clearDefault.eq('user_id', userId).isFilter('space_id', null)
+          : clearDefault.eq('space_id', spaceId);
+      await clearDefault;
     }
-    await _supabase
+    var update = _supabase
         .from('accounts')
         .update(account.toJson())
-        .eq('id', account.id)
-        .eq('user_id', userId);
+        .eq('id', account.id);
+    update = spaceId == null
+        ? update.eq('user_id', userId).isFilter('space_id', null)
+        : update.eq('space_id', spaceId);
+    await update;
   }
 
-  Future<void> delete(String accountId) async {
+  Future<void> delete(String accountId, {String? spaceId}) async {
     final userId = await _resolveUserId();
-    await _supabase
-        .from('accounts')
-        .delete()
-        .eq('id', accountId)
-        .eq('user_id', userId);
+    var query = _supabase.from('accounts').delete().eq('id', accountId);
+    query = spaceId == null
+        ? query.eq('user_id', userId).isFilter('space_id', null)
+        : query.eq('space_id', spaceId);
+    await query;
   }
 
   Future<double> getBalance(String accountId) async {
@@ -131,8 +144,10 @@ class AccountRepository {
     return (response as num?)?.toDouble() ?? 0;
   }
 
-  Future<List<AccountWithBalance>> fetchAllWithBalances() async {
-    final accounts = await fetchAll();
+  Future<List<AccountWithBalance>> fetchAllWithBalances({
+    String? spaceId,
+  }) async {
+    final accounts = await fetchAll(spaceId: spaceId);
     final withBalances = <AccountWithBalance>[];
     for (final account in accounts) {
       final balance = await getBalance(account.id);

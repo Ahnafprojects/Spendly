@@ -17,6 +17,7 @@ import '../../../shared/services/offline_store.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../auth/auth_notifier.dart';
 import '../../auth/auth_service.dart';
+import '../../spaces/space_notifier.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -542,6 +543,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final card = isDark ? const Color(0xFF151A2A) : Colors.white;
     final border = isDark ? Colors.white10 : const Color(0xFFDCE2F0);
     final textMuted = isDark ? Colors.white60 : const Color(0xFF5B6275);
+    final pendingInvites =
+        ref.watch(spaceInboxInvitationsProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       backgroundColor: bg,
@@ -653,6 +656,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _saveBool(_kBudgetAlert, v);
               },
             ),
+          ),
+          const SizedBox(height: 14),
+          _sectionTitle(_t('Shared Space', 'Shared Space')),
+          _tile(
+            icon: Icons.groups_rounded,
+            title: _t('Shared Members', 'Shared Members'),
+            subtitle: _t(
+              'Kelola anggota dan role shared space',
+              'Manage shared members and roles',
+            ),
+            onTap: () => context.pushNamed('members'),
+          ),
+          _tile(
+            icon: Icons.mail_outline_rounded,
+            title: _t('Invitation Inbox', 'Invitation Inbox'),
+            subtitle: pendingInvites > 0
+                ? '$pendingInvites ${_t('undangan pending', 'pending invitations')}'
+                : _t('Tidak ada undangan pending', 'No pending invitations'),
+            onTap: () => context.pushNamed('invitation-inbox'),
+          ),
+          _tile(
+            icon: Icons.history_toggle_off_rounded,
+            title: _t('Activity Feed', 'Activity Feed'),
+            subtitle: _t(
+              'Lihat aktivitas terbaru shared space',
+              'See latest shared space activities',
+            ),
+            onTap: () => context.pushNamed('space-activity'),
           ),
           const SizedBox(height: 14),
           _sectionTitle(_t('Data & Keamanan', 'Data & Security')),

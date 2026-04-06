@@ -30,6 +30,20 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     return key;
   }
 
+  String _rangeLabel(AnalyticsState data) {
+    final locale = LanguageSettings.current.locale.toString();
+    final start = DateFormat('dd MMM yyyy', locale).format(data.rangeStart);
+    final end = DateFormat('dd MMM yyyy', locale).format(data.rangeEnd);
+    return '$start - $end';
+  }
+
+  String _monthLabel(DateTime month) {
+    return DateFormat(
+      'MMMM yyyy',
+      LanguageSettings.current.locale.toString(),
+    ).format(month);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(appLanguageProvider);
@@ -86,6 +100,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
           _buildPeriodSelector(data.period),
+          if (data.period == 'Monthly') ...[
+            const SizedBox(height: 10),
+            _buildMonthNavigator(data.selectedMonth),
+          ],
+          const SizedBox(height: 10),
+          _buildRangeInfo(data),
           const SizedBox(height: 18),
           _buildHeroSummary(data),
           const SizedBox(height: 18),
@@ -105,6 +125,48 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           _buildSectionTitle(_t('Pengeluaran Terbesar', 'Top Spending')),
           const SizedBox(height: 12),
           _buildTopSpendingCard(data.categoryMetrics, data.totalExpense),
+          if (data.userContributions.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            _buildSectionTitle(
+              _t('Kontribusi Anggota', 'Member Contributions'),
+            ),
+            const SizedBox(height: 12),
+            _buildMemberContributionsCard(data.userContributions),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRangeInfo(AnalyticsState data) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151A2A) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.calendar_month_rounded,
+            size: 16,
+            color: isDark ? Colors.white60 : const Color(0xFF5B6275),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _rangeLabel(data),
+              style: TextStyle(
+                color: isDark ? Colors.white70 : const Color(0xFF5B6275),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -167,6 +229,57 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMonthNavigator(DateTime selectedMonth) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentMonth = DateTime.now();
+    final isCurrentMonth =
+        selectedMonth.year == currentMonth.year &&
+        selectedMonth.month == currentMonth.month;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151A2A) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white12 : const Color(0xFFDDE5F7),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            splashRadius: 18,
+            onPressed: () =>
+                ref.read(analyticsNotifierProvider.notifier).changeMonth(-1),
+            icon: const Icon(Icons.chevron_left_rounded),
+          ),
+          Expanded(
+            child: Text(
+              _monthLabel(selectedMonth),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            splashRadius: 18,
+            onPressed: isCurrentMonth
+                ? null
+                : () => ref
+                      .read(analyticsNotifierProvider.notifier)
+                      .changeMonth(1),
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
       ),
     );
   }
@@ -647,6 +760,102 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                       Color(0xFF4F6EF7),
                     ),
                   ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMemberContributionsCard(
+    List<UserContributionMetric> contributions,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151A2A) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFDDE5F7),
+        ),
+      ),
+      child: Column(
+        children: contributions.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E2437)
+                            : const Color(0xFFEAF1FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: 16,
+                        color: isDark
+                            ? Colors.white60
+                            : const Color(0xFF5B6275),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        item.displayName,
+                        style: TextStyle(
+                          color: isDark ? Colors.white : const Color(0xFF1A1E2A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const SizedBox(width: 42),
+                    const Icon(
+                      Icons.south_west_rounded,
+                      size: 13,
+                      color: Color(0xFF00D4AA),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      CurrencySettings.formatCompact(item.totalIncome),
+                      style: const TextStyle(
+                        color: Color(0xFF00D4AA),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Icon(
+                      Icons.north_east_rounded,
+                      size: 13,
+                      color: Color(0xFFFF5A6E),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      CurrencySettings.formatCompact(item.totalExpense),
+                      style: const TextStyle(
+                        color: Color(0xFFFF5A6E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -7,6 +7,7 @@ class AccountModel {
   final String type;
   final String icon;
   final String color;
+  final String? spaceId;
   final double initialBalance;
   final bool isDefault;
   final DateTime createdAt;
@@ -19,6 +20,7 @@ class AccountModel {
     required this.type,
     required this.icon,
     required this.color,
+    this.spaceId,
     required this.initialBalance,
     required this.isDefault,
     required this.createdAt,
@@ -33,6 +35,7 @@ class AccountModel {
       type: (json['type'] ?? 'other').toString(),
       icon: (json['icon'] ?? '💳').toString(),
       color: (json['color'] ?? '#4F6EF7').toString(),
+      spaceId: json['space_id']?.toString(),
       initialBalance: (json['initial_balance'] as num?)?.toDouble() ?? 0,
       isDefault: json['is_default'] == true,
       createdAt:
@@ -52,6 +55,7 @@ class AccountModel {
       'type': type,
       'icon': icon,
       'color': color,
+      'space_id': spaceId,
       'initial_balance': initialBalance,
       'is_default': isDefault,
       'created_at': createdAt.toIso8601String(),
@@ -66,6 +70,7 @@ class AccountModel {
     String? type,
     String? icon,
     String? color,
+    String? spaceId,
     double? initialBalance,
     bool? isDefault,
     DateTime? createdAt,
@@ -78,6 +83,7 @@ class AccountModel {
       type: type ?? this.type,
       icon: icon ?? this.icon,
       color: color ?? this.color,
+      spaceId: spaceId ?? this.spaceId,
       initialBalance: initialBalance ?? this.initialBalance,
       isDefault: isDefault ?? this.isDefault,
       createdAt: createdAt ?? this.createdAt,

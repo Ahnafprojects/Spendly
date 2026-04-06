@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../analytics/analytics_notifier.dart';
 import '../../budget/budget_notifier.dart';
 import '../../transaction/transaction_notifier.dart';
+import '../../spaces/space_notifier.dart';
 import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
@@ -53,6 +54,7 @@ class _TransferSheetState extends ConsumerState<TransferSheet> {
             toId: _toId!,
             amount: _parseAmount(_amountController.text),
             note: _noteController.text.trim(),
+            spaceId: ref.read(activeSpaceIdProvider),
           );
 
       unawaited(

@@ -10,6 +10,7 @@ import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../account/account_notifier.dart';
 import '../../account/account_repository.dart';
+import '../../spaces/space_notifier.dart';
 import '../transaction_repository.dart';
 import '../transaction_notifier.dart';
 
@@ -73,6 +74,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           ? null
           : _noteController.text.trim();
       final activeAccountId = ref.read(activeAccountIdProvider);
+      final activeSpaceId = ref.read(activeSpaceIdProvider);
       if (activeAccountId == null || activeAccountId.isEmpty) {
         throw Exception(
           _t('Pilih akun terlebih dahulu', 'Select account first'),
@@ -108,6 +110,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           category: _category,
           note: note,
           accountId: activeAccountId,
+          spaceId: activeSpaceId,
           date: now,
           createdAt: now,
         );
@@ -137,12 +140,16 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           category: _category,
           note: note,
           accountId: initial.accountId ?? activeAccountId,
+          spaceId: activeSpaceId,
           transferDirection: initial.transferDirection,
           transferGroupId: initial.transferGroupId,
           date: normalizedDate,
           createdAt: initial.createdAt,
         );
-        await ref.read(transactionRepositoryProvider).update(updated);
+        await ref
+            .read(transactionRepositoryProvider)
+            .update(updated, spaceId: activeSpaceId);
+        await ref.read(transactionNotifierProvider.notifier).refresh();
       }
       if (!mounted) return;
       AppNotice.success(

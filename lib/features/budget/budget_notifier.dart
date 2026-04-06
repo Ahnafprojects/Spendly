@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../shared/services/activity_log_service.dart';
 import '../account/account_notifier.dart';
+import '../spaces/space_notifier.dart';
 import 'budget_repository.dart';
 import 'models/budget_usage_model.dart';
 
@@ -19,6 +21,7 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
   FutureOr<BudgetState> build() async {
     _repository = ref.watch(budgetRepositoryProvider);
     ref.watch(activeAccountIdProvider);
+    ref.watch(activeSpaceIdProvider);
     return _fetchData(_currentMonth);
   }
 
@@ -26,6 +29,7 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
     final usages = await _repository.fetchBudgetUsage(
       month,
       accountId: ref.read(activeAccountIdProvider),
+      spaceId: ref.read(activeSpaceIdProvider),
     );
     return BudgetState(selectedMonth: month, usages: usages);
   }
@@ -42,12 +46,36 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
   }
 
   Future<void> upsertBudget(String category, double limit) async {
-    await _repository.upsertBudget(category, limit, _currentMonth);
+    await _repository.upsertBudget(
+      category,
+      limit,
+      _currentMonth,
+      ref.read(activeSpaceIdProvider),
+    );
+    await ref
+        .read(activityLogServiceProvider)
+        .log(
+          action: 'edit_budget',
+          description:
+              'Mengubah budget $category menjadi ${limit.toStringAsFixed(0)}',
+          metadata: {'category': category, 'limit': limit},
+        );
     await reload();
   }
 
   Future<void> deleteBudget(String category) async {
-    await _repository.deleteBudget(category, _currentMonth);
+    await _repository.deleteBudget(
+      category,
+      _currentMonth,
+      ref.read(activeSpaceIdProvider),
+    );
+    await ref
+        .read(activityLogServiceProvider)
+        .log(
+          action: 'delete_budget',
+          description: 'Menghapus budget $category',
+          metadata: {'category': category},
+        );
     await reload();
   }
 }

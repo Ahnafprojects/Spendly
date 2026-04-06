@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/analytics/screens/analytics_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
+import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
 import '../../features/navigation/screens/main_tab_screen.dart';
+import '../../features/savings/screens/savings_screen.dart';
+import '../../features/spaces/screens/activity_feed_screen.dart';
+import '../../features/spaces/screens/invite_screen.dart';
+import '../../features/spaces/screens/members_screen.dart';
 import '../../features/transaction/screens/add_transaction_screen.dart';
-import '../../features/transfer/screens/transfer_screen.dart';
 import '../../shared/models/transaction_model.dart';
 
 // Provider untuk Router agar mudah diakses secara global
@@ -22,7 +26,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const AuthScreen(),
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/auth',
@@ -51,7 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/transfer',
         name: 'transfer',
-        builder: (context, state) => const TransferScreen(),
+        builder: (context, state) => const SavingsScreen(),
       ),
       GoRoute(
         path: '/analytics',
@@ -72,6 +76,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const MainTabScreen(currentIndex: 3),
+      ),
+      GoRoute(
+        path: '/members',
+        name: 'members',
+        builder: (context, state) => const MembersScreen(),
+      ),
+      GoRoute(
+        path: '/invite-member',
+        name: 'invite-member',
+        builder: (context, state) => const InviteScreen(),
+      ),
+      GoRoute(
+        path: '/invitation-inbox',
+        name: 'invitation-inbox',
+        builder: (context, state) => const InviteScreen(inboxMode: true),
+      ),
+      GoRoute(
+        path: '/space-activity',
+        name: 'space-activity',
+        builder: (context, state) => const ActivityFeedScreen(),
       ),
     ],
   );

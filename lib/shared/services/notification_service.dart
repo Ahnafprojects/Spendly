@@ -87,4 +87,35 @@ class NotificationService {
       details,
     );
   }
+
+  static Future<void> showSavingsGoalReminder({
+    required String goalId,
+    required String goalName,
+    required double progressPct,
+    required int daysRemaining,
+  }) async {
+    if (!await _canNotifyToday(goalId, 'savings_deadline')) return;
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'savings_goal_channel',
+          'Savings Goal Alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+          color: Color(0xFF4F6EF7),
+        );
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
+
+    final dayText = daysRemaining <= 0
+        ? 'hari ini'
+        : '$daysRemaining hari lagi';
+    await _notificationsPlugin.show(
+      goalId.hashCode,
+      'Goal "$goalName" mendekati target date',
+      'Progress baru ${progressPct.toStringAsFixed(0)}%. Deadline $dayText.',
+      details,
+    );
+  }
 }
