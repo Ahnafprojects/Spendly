@@ -10,13 +10,19 @@ import '../../../shared/services/language_settings.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../account/account_notifier.dart';
 import '../../account/account_repository.dart';
+import '../../receipt_scan/receipt_data_model.dart';
 import '../../spaces/space_notifier.dart';
 import '../transaction_repository.dart';
 import '../transaction_notifier.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   final TransactionModel? initialTransaction;
-  const AddTransactionScreen({super.key, this.initialTransaction});
+  final ReceiptTransactionDraft? receiptDraft;
+  const AddTransactionScreen({
+    super.key,
+    this.initialTransaction,
+    this.receiptDraft,
+  });
 
   @override
   ConsumerState<AddTransactionScreen> createState() =>
@@ -48,6 +54,16 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       _category = tx.category;
       _amountController.text = CurrencySettings.formatInputFromIdr(tx.amount);
       _noteController.text = tx.note ?? '';
+    } else {
+      final draft = widget.receiptDraft;
+      if (draft != null) {
+        _type = 'expense';
+        _category = draft.category;
+        _amountController.text = CurrencySettings.formatInputFromIdr(
+          draft.amount,
+        );
+        _noteController.text = draft.note ?? '';
+      }
     }
   }
 
@@ -73,6 +89,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       final note = _noteController.text.trim().isEmpty
           ? null
           : _noteController.text.trim();
+      final draftDate = widget.receiptDraft?.date;
       final activeAccountId = ref.read(activeAccountIdProvider);
       final activeSpaceId = ref.read(activeSpaceIdProvider);
       if (activeAccountId == null || activeAccountId.isEmpty) {
@@ -111,12 +128,15 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           note: note,
           accountId: activeAccountId,
           spaceId: activeSpaceId,
-          date: now,
+          date: draftDate ?? now,
           createdAt: now,
         );
         await ref
             .read(transactionNotifierProvider.notifier)
-            .addTransaction(transaction);
+            .addTransaction(
+              transaction,
+              receiptData: widget.receiptDraft?.receiptData,
+            );
       } else {
         final originalDate = initial.date;
         final normalizedDate =
@@ -198,6 +218,15 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
               ? _t('Tambah Transaksi', 'Add Transaction')
               : _t('Edit Transaksi', 'Edit Transaction'),
         ),
+        actions: widget.initialTransaction == null
+            ? [
+                IconButton(
+                  onPressed: () => context.pushNamed('scan-receipt'),
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  tooltip: 'Scan Struk',
+                ),
+              ]
+            : null,
         backgroundColor: bg,
         elevation: 0,
       ),

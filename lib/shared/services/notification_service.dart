@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/insights/insights_model.dart';
 import 'currency_settings.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  static final StreamController<String> _routeTapController =
+      StreamController<String>.broadcast();
+  static String? _initialRoute;
+
+  static Stream<String> get routeTapStream => _routeTapController.stream;
 
   static Future<void> initialize() async {
     const AndroidInitializationSettings androidSettings =
@@ -22,7 +30,28 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    await _notificationsPlugin.initialize(initSettings);
+    await _notificationsPlugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          _routeTapController.add(payload);
+        }
+      },
+    );
+
+    final launchDetails = await _notificationsPlugin
+        .getNotificationAppLaunchDetails();
+    final route = launchDetails?.notificationResponse?.payload;
+    if (route != null && route.isNotEmpty) {
+      _initialRoute = route;
+    }
+  }
+
+  static String? takeInitialRoute() {
+    final route = _initialRoute;
+    _initialRoute = null;
+    return route;
   }
 
   static Future<bool> _canNotifyToday(String category, String type) async {
@@ -116,6 +145,41 @@ class NotificationService {
       'Goal "$goalName" mendekati target date',
       'Progress baru ${progressPct.toStringAsFixed(0)}%. Deadline $dayText.',
       details,
+    );
+  }
+
+  static Future<void> maybeShowWeeklyDigest(InsightsBundle bundle) async {
+    final now = DateTime.now();
+    if (now.weekday != DateTime.monday || now.hour < 6) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final monday = DateTime(now.year, now.month, now.day);
+    final key = 'weekly_digest_${DateFormat('yyyy-MM-dd').format(monday)}';
+    if (prefs.getBool(key) == true) return;
+
+    await showWeeklyDigest(body: bundle.mainInsight.title);
+    await prefs.setBool(key, true);
+  }
+
+  static Future<void> showWeeklyDigest({
+    required String body,
+    String payload = '/insights',
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'weekly_digest_channel',
+      'Weekly Digest',
+      importance: Importance.high,
+      priority: Priority.high,
+      color: Color(0xFF4F6EF7),
+    );
+    const details = NotificationDetails(android: androidDetails);
+
+    await _notificationsPlugin.show(
+      9001,
+      'Ringkasan minggu lalu siap 📊',
+      body,
+      details,
+      payload: payload,
     );
   }
 }

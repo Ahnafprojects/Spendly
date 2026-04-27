@@ -30,6 +30,9 @@ dependencies:
   confetti: ^0.8.0
   flutter_local_notifications: ^17.1.0
   pdf: ^3.11.3
+  image_picker: ^1.1.2
+  camera: ^0.11.0+2
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +44,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
 
 flutter_launcher_icons:
   android: true

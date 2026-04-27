@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/services/activity_log_service.dart';
 import '../account/account_notifier.dart';
+import '../insights/insights_notifier.dart';
 import '../spaces/space_notifier.dart';
 import 'budget_repository.dart';
 import 'models/budget_usage_model.dart';
@@ -60,6 +61,7 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
               'Mengubah budget $category menjadi ${limit.toStringAsFixed(0)}',
           metadata: {'category': category, 'limit': limit},
         );
+    ref.invalidate(insightsNotifierProvider);
     await reload();
   }
 
@@ -76,6 +78,7 @@ class BudgetNotifier extends AsyncNotifier<BudgetState> {
           description: 'Menghapus budget $category',
           metadata: {'category': category},
         );
+    ref.invalidate(insightsNotifierProvider);
     await reload();
   }
 }

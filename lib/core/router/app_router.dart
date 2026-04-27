@@ -1,11 +1,16 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/analytics/screens/analytics_screen.dart';
+import '../../features/ai_chat/screens/chat_screen.dart';
 import '../../features/auth/screens/auth_screen.dart';
 import '../../features/auth/screens/splash_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/budget/screens/budget_screen.dart';
+import '../../features/insights/screens/insights_screen.dart';
 import '../../features/navigation/screens/main_tab_screen.dart';
+import '../../features/receipt_scan/receipt_data_model.dart';
+import '../../features/receipt_scan/screens/review_receipt_screen.dart';
+import '../../features/receipt_scan/screens/scanner_screen.dart';
 import '../../features/savings/screens/savings_screen.dart';
 import '../../features/spaces/screens/activity_feed_screen.dart';
 import '../../features/spaces/screens/invite_screen.dart';
@@ -39,11 +44,46 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MainTabScreen(currentIndex: 0),
       ),
       GoRoute(
+        path: '/ai-chat',
+        name: 'ai-chat',
+        builder: (context, state) => const ChatScreen(),
+      ),
+      GoRoute(
+        path: '/insights',
+        name: 'insights',
+        builder: (context, state) => const InsightsScreen(),
+      ),
+      GoRoute(
+        path: '/scan-receipt',
+        name: 'scan-receipt',
+        builder: (context, state) => ScannerScreen(
+          args: state.extra is ReceiptScanArgs
+              ? state.extra as ReceiptScanArgs
+              : const ReceiptScanArgs(),
+        ),
+      ),
+      GoRoute(
+        path: '/review-receipt',
+        name: 'review-receipt',
+        builder: (context, state) {
+          final args = state.extra is ReceiptReviewArgs
+              ? state.extra as ReceiptReviewArgs
+              : ReceiptReviewArgs(imagePath: state.extra?.toString() ?? '');
+          return ReviewReceiptScreen(
+            imagePath: args.imagePath,
+            transactionId: args.transactionId,
+          );
+        },
+      ),
+      GoRoute(
         path: '/add-transaction',
         name: 'add-transaction',
         builder: (context, state) => AddTransactionScreen(
           initialTransaction: state.extra is TransactionModel
               ? state.extra as TransactionModel
+              : null,
+          receiptDraft: state.extra is ReceiptTransactionDraft
+              ? state.extra as ReceiptTransactionDraft
               : null,
         ),
       ),

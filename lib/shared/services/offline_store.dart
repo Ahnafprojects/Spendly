@@ -11,6 +11,7 @@ class OfflineStore {
   String _budgetKey(String userId) => 'offline_budgets_$userId';
   String _txOpsKey(String userId) => 'offline_tx_ops_$userId';
   String _budgetOpsKey(String userId) => 'offline_budget_ops_$userId';
+  String _receiptMetaKey(String userId) => 'offline_receipt_meta_$userId';
 
   List<Map<String, dynamic>> _decodeList(String? raw) {
     if (raw == null || raw.isEmpty) return [];
@@ -149,12 +150,68 @@ class OfflineStore {
     await writePendingBudgetOps(userId, ops);
   }
 
+  Future<Map<String, Map<String, dynamic>>> readReceiptMetadata(
+    String userId,
+  ) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_receiptMetaKey(userId));
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      return decoded.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{},
+        ),
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> writeReceiptMetadata(
+    String userId,
+    Map<String, Map<String, dynamic>> data,
+  ) async {
+    final prefs = await _prefs;
+    await prefs.setString(_receiptMetaKey(userId), jsonEncode(data));
+  }
+
+  Future<void> saveReceiptMetadata(
+    String userId,
+    String transactionId,
+    Map<String, dynamic> metadata,
+  ) async {
+    final current = await readReceiptMetadata(userId);
+    current[transactionId] = metadata;
+    await writeReceiptMetadata(userId, current);
+  }
+
+  Future<Map<String, dynamic>?> readReceiptMetadataForTransaction(
+    String userId,
+    String transactionId,
+  ) async {
+    final current = await readReceiptMetadata(userId);
+    return current[transactionId];
+  }
+
+  Future<void> deleteReceiptMetadata(
+    String userId,
+    String transactionId,
+  ) async {
+    final current = await readReceiptMetadata(userId);
+    current.remove(transactionId);
+    await writeReceiptMetadata(userId, current);
+  }
+
   Future<void> clearUserData(String userId) async {
     final prefs = await _prefs;
     await prefs.remove(_txKey(userId));
     await prefs.remove(_budgetKey(userId));
     await prefs.remove(_txOpsKey(userId));
     await prefs.remove(_budgetOpsKey(userId));
+    await prefs.remove(_receiptMetaKey(userId));
   }
 
   Future<void> saveLastUserId(String userId) async {

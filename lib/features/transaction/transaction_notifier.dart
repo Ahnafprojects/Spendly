@@ -6,6 +6,8 @@ import '../../shared/services/budget_checker.dart';
 import '../account/account_notifier.dart';
 import '../analytics/analytics_notifier.dart';
 import '../budget/budget_notifier.dart';
+import '../insights/insights_notifier.dart';
+import '../receipt_scan/receipt_data_model.dart';
 import '../spaces/space_notifier.dart';
 import 'transaction_repository.dart';
 
@@ -36,17 +38,27 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
     ref.invalidate(accountBalancesProvider);
   }
 
-  Future<void> addTransaction(TransactionModel transaction) async {
-    await _repository.insert(
+  Future<void> addTransaction(
+    TransactionModel transaction, {
+    ReceiptData? receiptData,
+  }) async {
+    final transactionId = await _repository.insert(
       transaction,
       spaceId: ref.read(activeSpaceIdProvider),
     );
+    if (receiptData != null) {
+      await _repository.saveReceiptMetadata(
+        transactionId,
+        receiptData.toJson(),
+      );
+    }
 
     await BudgetChecker.checkAndNotify(transaction.date);
 
     ref.read(budgetNotifierProvider.notifier).reload();
     ref.invalidate(accountBalancesProvider);
     ref.invalidate(analyticsNotifierProvider);
+    ref.invalidate(insightsNotifierProvider);
     await ref
         .read(activityLogServiceProvider)
         .log(
@@ -74,8 +86,10 @@ class TransactionNotifier extends AsyncNotifier<List<TransactionModel>> {
 
     try {
       await _repository.delete(id);
+      await _repository.deleteReceiptMetadata(id);
       ref.invalidate(accountBalancesProvider);
       ref.invalidate(analyticsNotifierProvider);
+      ref.invalidate(insightsNotifierProvider);
       await ref
           .read(activityLogServiceProvider)
           .log(

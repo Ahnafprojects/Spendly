@@ -133,10 +133,14 @@ class SpaceRepository {
   }
 
   Future<void> acceptInvitation(String invitationId) async {
-    await _supabase.rpc(
-      'accept_space_invitation',
-      params: {'p_invitation_id': invitationId},
-    );
+    try {
+      await _supabase.rpc(
+        'accept_space_invitation',
+        params: {'p_invitation_id': invitationId},
+      );
+    } on PostgrestException catch (e) {
+      throw Exception(_mapAcceptInvitationError(e));
+    }
   }
 
   Future<void> declineInvitation(String invitationId) async {
@@ -230,6 +234,38 @@ class SpaceRepository {
       'description': description,
       'metadata': metadata,
     });
+  }
+
+  String _mapAcceptInvitationError(PostgrestException error) {
+    final code = error.code?.trim();
+    final message = error.message.toString().trim();
+    final details = (error.details ?? '').toString().trim();
+    final hint = (error.hint ?? '').toString().trim();
+    final combined = [
+      message,
+      details,
+      hint,
+    ].where((value) => value.isNotEmpty).join(' ').toLowerCase();
+
+    if (code == 'PGRST202' || combined.contains('accept_space_invitation')) {
+      return 'Fitur accept invitation di database belum aktif. Jalankan SQL hotfix accept invitation lalu reload schema Supabase.';
+    }
+    if (combined.contains('invitation_not_found')) {
+      return 'Undangan tidak ditemukan.';
+    }
+    if (combined.contains('invitation_not_pending')) {
+      return 'Undangan ini sudah tidak pending.';
+    }
+    if (combined.contains('invitation_expired')) {
+      return 'Undangan sudah kedaluwarsa.';
+    }
+    if (combined.contains('forbidden') || code == '42501') {
+      return 'Akun ini tidak punya izin menerima undangan tersebut. Pastikan email akun yang login sama dengan email yang diundang.';
+    }
+
+    return message.isNotEmpty
+        ? message
+        : 'Gagal menerima undangan shared space.';
   }
 }
 

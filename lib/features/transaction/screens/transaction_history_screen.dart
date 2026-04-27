@@ -341,6 +341,43 @@ class _TransactionHistoryScreenState
                                     ),
                                   ),
                                   const SizedBox(height: 3),
+                                  Consumer(
+                                    builder: (context, ref, _) {
+                                      final receiptState = ref.watch(
+                                        receiptMetadataProvider(tx.id),
+                                      );
+                                      final hasReceipt =
+                                          receiptState.valueOrNull != null;
+                                      if (!hasReceipt) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0x1A4F6EF7),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Ada struk',
+                                            style: TextStyle(
+                                              color: Color(0xFF4F6EF7),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
                                   Text(
                                     activeSpaceId != null &&
                                             tx.userName?.isNotEmpty == true

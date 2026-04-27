@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../receipt_scan/receipt_data_model.dart';
 import '../../../shared/models/transaction_model.dart';
 import '../../../shared/services/app_text.dart';
 import '../../../shared/services/currency_settings.dart';
@@ -64,9 +68,9 @@ class _TransactionDetailScreenState
 
     setState(() => _deleting = true);
     try {
-      await ref
-          .read(transactionRepositoryProvider)
-          .delete(widget.transaction.id);
+      final repository = ref.read(transactionRepositoryProvider);
+      await repository.delete(widget.transaction.id);
+      await repository.deleteReceiptMetadata(widget.transaction.id);
       if (!mounted) return;
       AppNotice.info(context, _t('Transaksi dihapus', 'Transaction deleted'));
       Navigator.pop(context, true);
@@ -159,6 +163,178 @@ class _TransactionDetailScreenState
             ),
           ),
           const SizedBox(height: 18),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _loadReceiptMetadata(tx.id),
+            builder: (context, snapshot) {
+              final raw = snapshot.data;
+              if (raw == null || raw.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              final receipt = ReceiptData.fromJson(raw);
+              final hasImage = receipt.imagePath.isNotEmpty;
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long_rounded,
+                          color: Color(0xFF4F6EF7),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _t('Struk Tersimpan', 'Saved Receipt'),
+                          style: TextStyle(
+                            color: title,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (hasImage)
+                      GestureDetector(
+                        onTap: () => _openReceiptPreview(receipt.imagePath),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.file(
+                            File(receipt.imagePath),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    if (hasImage) const SizedBox(height: 14),
+                    _infoRow(
+                      _t('Toko', 'Store'),
+                      receipt.storeName?.trim().isNotEmpty == true
+                          ? receipt.storeName!
+                          : '-',
+                      muted,
+                      title,
+                    ),
+                    _infoRow(
+                      _t('Akurasi OCR', 'OCR Accuracy'),
+                      '${receipt.confidence}%',
+                      muted,
+                      title,
+                    ),
+                    if (receipt.items.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _infoRow(
+                            _t('Item Terdeteksi', 'Detected Items'),
+                            '${receipt.items.length}',
+                            muted,
+                            title,
+                          ),
+                          const SizedBox(height: 4),
+                          ...receipt.items
+                              .take(8)
+                              .map(
+                                (item) => Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: item.isUncertain
+                                        ? const Color(0x14FFB020)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: item.isUncertain
+                                          ? const Color(0x33FFB020)
+                                          : border,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${item.qty}x ${item.name}',
+                                          style: TextStyle(
+                                            color: title,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      if (item.isUncertain)
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 8),
+                                          child: Text(
+                                            'Periksa',
+                                            style: TextStyle(
+                                              color: Color(0xFFFFB020),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      Text(
+                                        item.price == null
+                                            ? '-'
+                                            : CurrencySettings.format(
+                                                item.price!,
+                                              ),
+                                        style: TextStyle(color: muted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          if (receipt.items.length > 8)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                '+${receipt.items.length - 8} item lainnya',
+                                style: TextStyle(color: muted, fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (hasImage)
+                          TextButton.icon(
+                            onPressed: () =>
+                                _openReceiptPreview(receipt.imagePath),
+                            icon: const Icon(Icons.open_in_full_rounded),
+                            label: Text(
+                              _t('Lihat Struk Asli', 'View Original Receipt'),
+                            ),
+                          ),
+                        TextButton.icon(
+                          onPressed: _replaceReceipt,
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          label: Text(_t('Ganti Struk', 'Replace Receipt')),
+                        ),
+                        TextButton.icon(
+                          onPressed: _removeReceipt,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          label: Text(_t('Hapus Struk', 'Remove Receipt')),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 18),
           SizedBox(
             height: 50,
             child: OutlinedButton.icon(
@@ -193,6 +369,63 @@ class _TransactionDetailScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _loadReceiptMetadata(
+    String transactionId,
+  ) async {
+    return ref
+        .read(transactionRepositoryProvider)
+        .readReceiptMetadata(transactionId);
+  }
+
+  Future<void> _replaceReceipt() async {
+    final changed = await context.pushNamed<bool>(
+      'scan-receipt',
+      extra: ReceiptScanArgs(transactionId: widget.transaction.id),
+    );
+    if (changed == true && mounted) {
+      setState(() {});
+      AppNotice.success(context, _t('Struk diperbarui', 'Receipt updated'));
+    }
+  }
+
+  Future<void> _removeReceipt() async {
+    await ref
+        .read(transactionRepositoryProvider)
+        .deleteReceiptMetadata(widget.transaction.id);
+    if (!mounted) return;
+    setState(() {});
+    AppNotice.info(context, _t('Struk dihapus', 'Receipt removed'));
+  }
+
+  Future<void> _openReceiptPreview(String imagePath) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4,
+                child: Image.file(File(imagePath), fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton.filled(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

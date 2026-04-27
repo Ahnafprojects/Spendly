@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'shared/services/currency_settings.dart';
+import 'shared/services/env_config.dart';
 import 'shared/services/language_settings.dart';
 import 'shared/services/notification_service.dart';
 
@@ -17,6 +19,7 @@ const _fallbackSupabaseAnonKey =
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EnvConfig.load();
 
   const supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
@@ -45,12 +48,39 @@ void main() async {
   );
 }
 
-// Menggunakan ConsumerWidget dari Riverpod untuk mendengarkan perubahan state
-class SpendlyApp extends ConsumerWidget {
+class SpendlyApp extends ConsumerStatefulWidget {
   const SpendlyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SpendlyApp> createState() => _SpendlyAppState();
+}
+
+class _SpendlyAppState extends ConsumerState<SpendlyApp> {
+  StreamSubscription<String>? _notificationRouteSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _notificationRouteSub = NotificationService.routeTapStream.listen((route) {
+      if (!mounted) return;
+      ref.read(routerProvider).go(route);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initialRoute = NotificationService.takeInitialRoute();
+      if (initialRoute != null && mounted) {
+        ref.read(routerProvider).go(initialRoute);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _notificationRouteSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Membaca state router dan tema dari provider yang sudah kita buat
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeProvider);

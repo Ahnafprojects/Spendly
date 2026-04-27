@@ -48,3 +48,4 @@ app.*.map.json
 android/app/keystore.jks
 fastlane/google-play-key.json
 keystore.jks
+.env

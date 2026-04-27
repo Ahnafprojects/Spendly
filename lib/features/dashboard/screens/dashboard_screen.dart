@@ -12,8 +12,10 @@ import '../../account/account_model.dart';
 import '../../account/account_notifier.dart';
 import '../../account/widgets/transfer_sheet.dart';
 import '../../analytics/analytics_repository.dart';
+import '../../insights/widgets/insights_dashboard_card.dart';
 import '../../spaces/space_notifier.dart';
 import '../../transaction/transaction_notifier.dart';
+import '../../transaction/transaction_repository.dart';
 import '../../transaction/screens/transaction_detail_screen.dart';
 import '../../../shared/models/transaction_model.dart';
 import '../../../shared/widgets/app_notice.dart';
@@ -160,6 +162,8 @@ class DashboardScreen extends ConsumerWidget {
 
                       const SizedBox(height: 32),
                       _buildQuickActions(context),
+                      const SizedBox(height: 32),
+                      const InsightsDashboardCard(),
                       const SizedBox(height: 32),
 
                       // Header Recent Transactions
@@ -331,7 +335,7 @@ class DashboardScreen extends ConsumerWidget {
     final displayName = (fullName != null && fullName.isNotEmpty)
         ? fullName.split(' ').first
         : (user?.email?.split('@').first ??
-            AppText.t(id: 'Pengguna', en: 'User'));
+              AppText.t(id: 'Pengguna', en: 'User'));
     final dateLabel = DateFormat(
       'EEEE, d MMM',
       LanguageSettings.current.locale.toString(),
@@ -624,6 +628,18 @@ class DashboardScreen extends ConsumerWidget {
         label: AppText.t(id: 'Shared', en: 'Shared'),
         color: const Color(0xFF64748B),
         onTap: () => context.pushNamed('members'),
+      ),
+      (
+        icon: Icons.smart_toy_rounded,
+        label: AppText.t(id: 'AI Chat', en: 'AI Chat'),
+        color: const Color(0xFF6B3FE7),
+        onTap: () => context.pushNamed('ai-chat'),
+      ),
+      (
+        icon: Icons.document_scanner_rounded,
+        label: AppText.t(id: 'Scan Struk', en: 'Scan Receipt'),
+        color: const Color(0xFFFF8A34),
+        onTap: () => context.pushNamed('scan-receipt'),
       ),
     ];
 
@@ -968,6 +984,37 @@ class DashboardScreen extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final receiptState = ref.watch(
+                          receiptMetadataProvider(tx.id),
+                        );
+                        if (receiptState.valueOrNull == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return const Padding(
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.receipt_long_rounded,
+                                size: 13,
+                                color: Color(0xFF4F6EF7),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Struk tersimpan',
+                                style: TextStyle(
+                                  color: Color(0xFF4F6EF7),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     Text(
                       '${localizeCategory(tx.category)} • $formattedDate',
                       style: TextStyle(color: muted, fontSize: 12),

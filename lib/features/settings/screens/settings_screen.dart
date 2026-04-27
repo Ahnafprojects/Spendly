@@ -658,6 +658,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 14),
+          _sectionTitle(_t('AI Premium', 'AI Premium')),
+          _tile(
+            icon: Icons.smart_toy_rounded,
+            title: _t('Spendly AI', 'Spendly AI'),
+            subtitle: _t(
+              'Tanya langsung soal pengeluaran dan budget kamu',
+              'Ask directly about your spending and budget',
+            ),
+            onTap: () => context.pushNamed('ai-chat'),
+          ),
+          _tile(
+            icon: Icons.auto_awesome_rounded,
+            title: _t('AI Insights', 'AI Insights'),
+            subtitle: _t(
+              'Lihat insight personal berbasis transaksi kamu',
+              'See personal insights based on your transactions',
+            ),
+            onTap: () => context.pushNamed('insights'),
+          ),
+          const SizedBox(height: 14),
           _sectionTitle(_t('Shared Space', 'Shared Space')),
           _tile(
             icon: Icons.groups_rounded,

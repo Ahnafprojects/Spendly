@@ -27,6 +27,7 @@ class TransactionRepository {
   }
 
   bool get _canHitRemote => _supabase.auth.currentUser != null;
+  String? get currentUserId => _supabase.auth.currentUser?.id;
 
   String _generateUuidV4() {
     final rand = Random.secure();
@@ -169,11 +170,14 @@ class TransactionRepository {
   }
 
   // Menambahkan transaksi baru
-  Future<void> insert(TransactionModel transaction, {String? spaceId}) async {
+  Future<String> insert(TransactionModel transaction, {String? spaceId}) async {
     final userId = await _resolveUserId();
+    final transactionId = transaction.id.isEmpty
+        ? _generateUuidV4()
+        : transaction.id;
 
     final row = transaction.toJson()
-      ..['id'] = transaction.id.isEmpty ? _generateUuidV4() : transaction.id
+      ..['id'] = transactionId
       ..['user_id'] = userId
       ..['space_id'] = spaceId
       ..['created_at'] = transaction.createdAt.toIso8601String();
@@ -181,13 +185,14 @@ class TransactionRepository {
     await _offlineStore.upsertTransaction(userId, row);
     if (!_canHitRemote) {
       await _offlineStore.enqueuePendingTxOp(userId, 'upsert', row);
-      return;
+      return transactionId;
     }
     try {
       await _supabase.from('transactions').upsert(row, onConflict: 'id');
     } catch (_) {
       await _offlineStore.enqueuePendingTxOp(userId, 'upsert', row);
     }
+    return transactionId;
   }
 
   // Memperbarui transaksi yang sudah ada
@@ -224,8 +229,38 @@ class TransactionRepository {
       await _offlineStore.enqueuePendingTxOp(userId, 'delete', {'id': id});
     }
   }
+
+  Future<void> saveReceiptMetadata(
+    String transactionId,
+    Map<String, dynamic> metadata,
+  ) async {
+    final userId = await _resolveUserId();
+    await _offlineStore.saveReceiptMetadata(userId, transactionId, metadata);
+  }
+
+  Future<Map<String, dynamic>?> readReceiptMetadata(
+    String transactionId,
+  ) async {
+    final userId = await _resolveUserId();
+    return _offlineStore.readReceiptMetadataForTransaction(
+      userId,
+      transactionId,
+    );
+  }
+
+  Future<void> deleteReceiptMetadata(String transactionId) async {
+    final userId = await _resolveUserId();
+    await _offlineStore.deleteReceiptMetadata(userId, transactionId);
+  }
 }
 
 final transactionRepositoryProvider = Provider<TransactionRepository>((ref) {
   return TransactionRepository(offlineStore: OfflineStore());
 });
+
+final receiptMetadataProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, transactionId) {
+      return ref
+          .watch(transactionRepositoryProvider)
+          .readReceiptMetadata(transactionId);
+    });
